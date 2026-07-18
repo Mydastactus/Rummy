@@ -223,6 +223,17 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .deckOpt:hover{background:rgba(255,255,255,.1);}
 .deckOpt.active{border-color:var(--gold); background:rgba(230,193,90,.14); color:var(--gold);}
 
+/* ---------- BETS & STATS ---------- */
+.betItem{display:flex; align-items:center; gap:8px; background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:10px; padding:9px 11px; margin-bottom:8px; font-size:14px;}
+.betItem .txt{flex:1; min-width:0; overflow-wrap:break-word;}
+.betTag{font-size:10.5px; font-weight:800; letter-spacing:.5px; padding:3px 9px; border-radius:999px; border:1px solid; white-space:nowrap; text-transform:uppercase;}
+.betTag.pending{color:var(--gold); border-color:var(--gold-dim);}
+.betTag.active{color:#7fd8a4; border-color:rgba(127,216,164,.5);}
+.betTag.denied,.betTag.lost{color:#e89b93; border-color:rgba(232,155,147,.45);}
+.betTag.resolved,.betTag.won{color:var(--gold); border-color:var(--gold-dim);}
+.betTag.push{color:rgba(242,237,218,.6); border-color:rgba(255,255,255,.25);}
+.btn.sm{padding:7px 11px; font-size:12.5px; border-radius:9px;}
+
 /* ---------- JUNGLE DECK ---------- */
 .deck-jungle .card{
   background:
@@ -335,6 +346,10 @@ input{-webkit-user-select:text; user-select:text;}
       <button class="deckOpt active" id="deckClassic">🂡 Classic</button>
       <button class="deckOpt" id="deckJungle">🐆 Jungle</button>
     </div>
+    <div class="joinRow">
+      <button class="btn ghost" id="btnStats" style="flex:1;">📊 Stats</button>
+      <button class="btn ghost" id="btnBetBook" style="flex:1;">🎲 Bet book</button>
+    </div>
     <button class="btn ghost" id="btnHelp">📖 How to play</button>
   </div>
 </div>
@@ -368,7 +383,9 @@ input{-webkit-user-select:text; user-select:text;}
   <div id="actions">
     <button class="btn" id="btnMeld">✨ Play meld</button>
     <button class="btn warn" id="btnDiscard">🗑️ Discard</button>
+    <button class="btn alt hidden" id="btnUndo" title="Put picked-up pile cards back">↩️ Put back</button>
     <button class="btn ghost" id="btnSort" title="Auto-sort your hand by suit">🧹 Sort</button>
+    <button class="btn ghost hidden" id="btnBets" title="Round bets">🎲</button>
     <button class="btn ghost" id="btnDeck" title="Switch deck style">🎴</button>
     <button class="btn ghost" id="btnHelp2">📖</button>
   </div>
@@ -394,6 +411,7 @@ input{-webkit-user-select:text; user-select:text;}
       <thead><tr><th></th><th>Melded</th><th>Left in hand</th><th>Round</th><th>Total</th></tr></thead>
       <tbody id="roundRows"></tbody>
     </table>
+    <div id="roundBets"></div>
     <button class="btn big" id="btnNext">▶️ Deal the next round</button>
     <p id="waitHost" class="hidden" style="font-size:14px; opacity:.75;">Waiting for the host to deal…</p>
     <button class="btn ghost" id="btnQuit" style="color:#7b2ff7; border-color:#c9a7f5;">← Back to menu</button>
@@ -406,14 +424,15 @@ input{-webkit-user-select:text; user-select:text;}
     <h2>How to play Rummy 500 🎓</h2>
     <ol class="helpList">
       <li><b>The goal:</b> be the first to reach <b>500 points</b>. Points come from cards you play onto the table; cards stuck in your hand at the end of a round count <b>against</b> you.</li>
-      <li><b>Your turn, step 1 — Draw:</b> take the top card of the deck, <b>or</b> take from the discard pile. You can grab the top discard for free, or <b>dig deeper</b> — but then you take every card on top of it too, and you must play the card you dug for <b>immediately</b> in a meld.</li>
+      <li><b>Your turn, step 1 — Draw:</b> take the top card of the deck, <b>or</b> take from the discard pile. You can grab the top discard for free, or <b>dig deeper</b> — but then you take every card on top of it too, and you must play the card you dug for <b>immediately</b> in a meld. Grabbed too much by mistake? The <b>↩️ Put back</b> button returns everything to the pile, as long as you haven't played a card yet.</li>
       <li><b>Step 2 — Meld (optional):</b> lay down a <b>set</b> (3–4 cards of the same rank, like 7♠7♥7♦) or a <b>run</b> (3+ cards of the same suit in a row, like 4♣5♣6♣). You can also <b>lay off</b> cards onto any meld on the table — even your opponent's — and those points are yours!</li>
       <li><b>Step 3 — Discard:</b> end your turn by tossing one card onto the discard pile.</li>
       <li><b>Card points:</b> 2 through 9 = <b>5 points</b> each · 10, J, Q, K = <b>10 points</b> each · Aces = <b>15 points</b> (played above the king, in a set, or caught in your hand) but only <b>5 points</b> when played low, as the 1 in A-2-3.</li>
       <li><b>Jokers are WILD 🃏:</b> two per deck. A joker can stand in for any card in a meld (one joker per meld). A melded joker is worth <b>+50 points</b> — but get caught holding one when the round ends and it's <b>−50</b>. High risk, high reward, very Wall Street.</li>
       <li><b>Joker heist:</b> a melded joker shows which card it's standing in for. If you're holding that exact card, click the joker on your turn (after drawing, nothing selected) to swap your real card in and take the joker for yourself. You can even discard a joker — but the other player can scoop it right up.</li>
       <li><b>Round ends</b> when someone plays their last card or the deck runs out. Everyone scores: melded points minus what's left in hand (yes, you can go negative — ouch 📉).</li>
-      <li><b>Bull market:</b> first player to 500 wins the game. 🐂 beats 🐻… usually.</li>
+      <li><b>Side bets 🎲 (online games only):</b> tap the 🎲 button to bet chores, dinner, or bragging rights on the current round. Your opponent approves or denies it — if it's on, the round winner collects. Every settled bet is written down in the <b>📜 Bet book</b>. No welching.</li>
+      <li><b>Bull market:</b> first player to 500 wins the game. Wins, losses, and bet records live under <b>📊 Stats</b> on the menu.</li>
     </ol>
     <button class="btn big" id="btnCloseHelp">Got it! 👍</button>
   </div>
@@ -425,6 +444,43 @@ input{-webkit-user-select:text; user-select:text;}
     <h2>Connection lost 😢</h2>
     <p id="dcMsg">Your friend disconnected or the connection dropped.</p>
     <button class="btn big" id="btnDcMenu">← Back to menu</button>
+  </div>
+</div>
+
+<!-- ============ STATS ============ -->
+<div class="overlay hidden" id="statsOv">
+  <div class="ov-card">
+    <h2>📊 Your stats</h2>
+    <p style="font-size:12.5px; opacity:.6; margin:2px 0 6px;">Saved on this phone only — your opponent has their own.</p>
+    <table class="scoreTable"><tbody id="statsRows"></tbody></table>
+    <button class="btn big" id="btnCloseStats">Close</button>
+    <button class="btn ghost" id="btnResetStats">Reset stats</button>
+  </div>
+</div>
+
+<!-- ============ ROUND BETS (in-game) ============ -->
+<div class="overlay hidden" id="betsOv">
+  <div class="ov-card">
+    <h2>🎲 Round bets</h2>
+    <p style="font-size:13px; opacity:.7; margin:2px 0 12px;">Whoever wins this round wins the bet. Your opponent has to approve it first — house rules are still rules.</p>
+    <div id="betsList" style="text-align:left; max-height:34vh; overflow-y:auto;"></div>
+    <input id="betInput" placeholder="e.g. Loser does the dishes" maxlength="80">
+    <button class="btn big" id="btnProposeBet">🎲 Propose bet</button>
+    <div class="joinRow">
+      <button class="btn ghost" id="btnBetBook2" style="flex:1;">📜 Bet book</button>
+      <button class="btn ghost" id="btnCloseBets" style="flex:1;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ BET BOOK ============ -->
+<div class="overlay hidden" id="betBookOv">
+  <div class="ov-card">
+    <h2>📜 Bet book</h2>
+    <p style="font-size:12.5px; opacity:.6; margin:2px 0 10px;">Every settled bet, saved on this phone. No welching.</p>
+    <div id="betBookList" style="text-align:left; max-height:50vh; overflow-y:auto;"></div>
+    <button class="btn big" id="btnCloseBetBook">Close</button>
+    <button class="btn ghost" id="btnClearBetBook">Clear history</button>
   </div>
 </div>
 
@@ -569,6 +625,10 @@ function Game(names){
   this.gameOver=null;
   this.events=[];
   this.roundOver=null;
+  this.gid=Math.random().toString(36).slice(2,9); // unique per game, for stats tracking
+  this.bets=[];
+  this.betSeq=0;
+  this.undo=null;
 }
 Game.prototype.ev=function(m){this.events.push(m);if(this.events.length>40)this.events.shift();};
 Game.prototype.deal=function(){
@@ -586,6 +646,8 @@ Game.prototype.deal=function(){
   this.phase='draw';
   this.mustMeld=null;
   this.roundOver=null;
+  this.bets=[];
+  this.undo=null;
   this.ev('Round '+this.round+'! '+this.names[this.turn]+' goes first 🎲');
 };
 Game.prototype.chk=function(p,phase){
@@ -600,6 +662,7 @@ Game.prototype.drawStock=function(p){
   if(!this.stock.length){this.endRound('stock',null);return null;}
   this.hands[p].push(this.stock.pop());
   this.phase='play';
+  this.undo=null; // deck draws can't be undone — you've seen the card
   this.ev(this.names[p]+' drew from the deck');
   if(!this.stock.length)this.ev('⚠️ That was the last deck card!');
   return null;
@@ -618,6 +681,7 @@ Game.prototype.drawDiscard=function(p,idx){
   this.hands[p]=this.hands[p].concat(taken);
   this.discard=this.discard.slice(0,idx);
   this.phase='play';
+  this.undo={ids:taken.map(function(c){return c.id;})}; // pile cards were public — safe to put back
   if(deep){
     this.mustMeld=target.id;
     this.ev(this.names[p]+' dug '+taken.length+' cards out of the pile! 😮');
@@ -655,6 +719,7 @@ Game.prototype.meld=function(p,ids){
   this.melds.push({type:info.type,aceHigh:!!info.aceHigh,cards:cards});
   if(this.mustMeld&&ids.indexOf(this.mustMeld)>=0)this.mustMeld=null;
   var pts=0;for(var i=0;i<cards.length;i++)pts+=cards[i].val;
+  this.undo=null;
   this.ev(this.names[p]+' melded for '+pts+' points! ✨');
   this.after(p);
   return null;
@@ -679,6 +744,7 @@ Game.prototype.layoff=function(p,ids,mi){
   if(info.jokerAs)for(var ji=0;ji<m.cards.length;ji++)if(m.cards[ji].joker)m.cards[ji].as=info.jokerAs;
   if(m.type==='run')sortRunCards(m.cards,m.aceHigh);
   if(this.mustMeld&&ids.indexOf(this.mustMeld)>=0)this.mustMeld=null;
+  this.undo=null;
   this.ev(this.names[p]+' laid off '+added.length+(added.length>1?' cards':' card')+' 👌');
   this.after(p);
   return null;
@@ -698,7 +764,47 @@ Game.prototype.swapJoker=function(p,mi){
   m.cards[ji]={id:real.id,suit:real.suit,rank:real.rank,by:p,val:meldCardVal(real,{type:m.type,aceHigh:m.aceHigh})};
   if(m.type==='run')sortRunCards(m.cards,m.aceHigh);
   this.hands[p].push({id:jk.id,suit:'X',rank:0,joker:true});
+  this.undo=null;
   this.ev(this.names[p]+' swapped the '+labelOf(needId)+' for the JOKER! 🃏');
+  return null;
+};
+Game.prototype.undoDraw=function(p){
+  var e=this.chk(p,'play');if(e)return e;
+  if(!this.undo)return "Nothing to put back — you've already played this turn";
+  var ids=this.undo.ids,cards=[],i;
+  for(i=0;i<ids.length;i++){
+    var c=this.takeFromHand(p,[ids[i]]);
+    if(!c)return 'Those cards are already in play';
+    cards.push(c[0]);
+  }
+  this.removeFromHand(p,ids);
+  this.discard=this.discard.concat(cards); // back in original order
+  this.mustMeld=null;
+  this.undo=null;
+  this.phase='draw';
+  this.ev(this.names[p]+' put '+cards.length+(cards.length>1?' cards':' card')+' back on the pile ↩️');
+  return null;
+};
+Game.prototype.proposeBet=function(p,text){
+  if(this.gameOver)return 'The game is over!';
+  if(this.roundOver)return 'Wait for the next round to start';
+  text=String(text||'').trim().slice(0,80);
+  if(!text)return 'Type what you want to bet!';
+  var pending=0;
+  for(var i=0;i<this.bets.length;i++)if(this.bets[i].status==='pending')pending++;
+  if(pending>=3)return 'Too many bets waiting for an answer';
+  this.bets.push({id:++this.betSeq,text:text,by:p,status:'pending'});
+  this.ev(this.names[p]+' proposed a bet: “'+text+'” 🎲');
+  return null;
+};
+Game.prototype.voteBet=function(p,id,ok){
+  var b=null;
+  for(var i=0;i<this.bets.length;i++)if(this.bets[i].id===id)b=this.bets[i];
+  if(!b)return 'Bet not found';
+  if(b.status!=='pending')return 'That bet was already answered';
+  if(b.by===p)return "You can't approve your own bet!";
+  b.status=ok?'active':'denied';
+  this.ev(ok?(this.names[p]+' accepted the bet: “'+b.text+'” 🤝'):(this.names[p]+' declined the bet: “'+b.text+'”'));
   return null;
 };
 Game.prototype.discardCard=function(p,id){
@@ -707,6 +813,7 @@ Game.prototype.discardCard=function(p,id){
   var cs=this.takeFromHand(p,[id]);if(!cs)return 'Card mix-up — try again';
   this.removeFromHand(p,[id]);
   this.discard.push(cs[0]);
+  this.undo=null;
   this.ev(this.names[p]+' discarded the '+cardLabel(cs[0]));
   if(this.hands[p].length===0){this.endRound('out',p);return null;}
   this.turn=1-p;
@@ -730,7 +837,14 @@ Game.prototype.endRound=function(reason,p){
   var deltas=[meldPts[0]-pens[0],meldPts[1]-pens[1]];
   this.scores[0]+=deltas[0];
   this.scores[1]+=deltas[1];
-  this.roundOver={reason:reason,who:p,meldPts:meldPts,pens:pens,deltas:deltas,scores:this.scores.slice()};
+  // settle the round's bets: round winner takes them; a tied round is a push
+  var rw=deltas[0]>deltas[1]?0:(deltas[1]>deltas[0]?1:-1);
+  for(i=0;i<this.bets.length;i++){
+    var b=this.bets[i];
+    if(b.status==='active'){b.status='resolved';b.winner=rw;}
+    else if(b.status==='pending'){b.status='denied';}
+  }
+  this.roundOver={reason:reason,who:p,meldPts:meldPts,pens:pens,deltas:deltas,scores:this.scores.slice(),winner:rw};
   if((this.scores[0]>=500||this.scores[1]>=500)&&this.scores[0]!==this.scores[1]){
     this.gameOver={winner:this.scores[0]>this.scores[1]?0:1};
   }
@@ -746,7 +860,9 @@ Game.prototype.viewFor=function(p){
     stock:this.stock?this.stock.length:0,
     mustMeld:this.mustMeld||null,
     events:this.events.slice(-4),
-    roundOver:this.roundOver, gameOver:this.gameOver
+    roundOver:this.roundOver, gameOver:this.gameOver,
+    gid:this.gid, bets:this.bets,
+    canUndo:!!(this.undo&&this.turn===p&&this.phase==='play'&&!this.roundOver&&!this.gameOver)
   };
 };
 
@@ -964,6 +1080,9 @@ function applyAction(a,p){
     case 'layoff':     return game.layoff(p,a.ids,a.mi);
     case 'discard':    return game.discardCard(p,a.id);
     case 'swapJoker':  return game.swapJoker(p,a.mi);
+    case 'undoDraw':   return game.undoDraw(p);
+    case 'betPropose': return game.proposeBet(p,a.text);
+    case 'betVote':    return game.voteBet(p,a.id,a.ok);
   }
   return 'Unknown action';
 }
@@ -1000,9 +1119,53 @@ function maybeRunAI(){
   })();
 }
 
+/* ---------- persistent storage (falls back to memory if blocked) ---------- */
+var memStore={};
+var store={
+  get:function(k,d){
+    try{var v=localStorage.getItem(k);if(v!==null)return JSON.parse(v);}catch(e){}
+    return memStore[k]!==undefined?memStore[k]:d;
+  },
+  set:function(k,v){
+    memStore[k]=v;
+    try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}
+  }
+};
+function freshStats(){return {gw:0,gl:0,rw:0,rl:0,rt:0,botW:0,botL:0,bw:0,bl:0};}
+
+/* ---------- stats & bet-book recording (once per round/game) ---------- */
+var recordedRounds={}, recordedGames={};
+function recordProgress(v){
+  if(!v.roundOver||!v.gid)return;
+  var rk=v.gid+':'+v.round;
+  if(recordedRounds[rk])return;
+  recordedRounds[rk]=1;
+  var s=store.get('rw_stats',freshStats());
+  var yd=v.roundOver.deltas[v.you], od=v.roundOver.deltas[1-v.you];
+  if(yd>od)s.rw++; else if(yd<od)s.rl++; else s.rt++;
+  var book=store.get('rw_bets',[]);
+  (v.bets||[]).forEach(function(b){
+    if(b.status==='resolved'){
+      var push=b.winner===-1, youWon=b.winner===v.you;
+      if(!push){if(youWon)s.bw++;else s.bl++;}
+      book.push({ts:Date.now(),round:v.round,text:b.text,youWon:youWon,push:push,opp:v.names[1-v.you]});
+    }
+  });
+  store.set('rw_bets',book);
+  if(v.gameOver&&!recordedGames[v.gid]){
+    recordedGames[v.gid]=1;
+    var won=v.gameOver.winner===v.you;
+    if(won)s.gw++; else s.gl++;
+    if(mode==='ai'){if(won)s.botW++; else s.botL++;}
+  }
+  store.set('rw_stats',s);
+}
+
 /* ---------- rendering ---------- */
+var prevPendingKey='';
 function render(v){
   curView=v;
+  recordProgress(v);
   hide($('menu'));show($('game'));
   var myTurn=v.turn===v.you && !v.roundOver && !v.gameOver;
   var canPlay=myTurn&&v.phase==='play';
@@ -1107,6 +1270,17 @@ function render(v){
   $('status').textContent=st;
   $('btnMeld').disabled=!(canPlay&&selIds().length>=3);
   $('btnDiscard').disabled=!(canPlay&&selIds().length===1&&!v.mustMeld);
+  $('btnUndo').classList.toggle('hidden',!v.canUndo);
+  $('btnBets').classList.toggle('hidden',mode==='ai');
+
+  // nudge when the opponent proposes a bet
+  var pendKey=(v.bets||[]).filter(function(b){return b.status==='pending'&&b.by!==v.you;})
+                          .map(function(b){return b.id;}).join(',');
+  if(pendKey&&pendKey!==prevPendingKey){
+    toast('🎲 '+v.names[1-v.you]+' proposed a bet — tap 🎲 to answer!');
+  }
+  prevPendingKey=pendKey;
+  if(!$('betsOv').classList.contains('hidden'))renderBetsPanel(v);
 
   // log line
   $('log').textContent=v.events.length?v.events[v.events.length-1]:'';
@@ -1137,6 +1311,18 @@ function render(v){
           +'<td><b>'+ro.scores[p]+'</b></td></tr>';
     });
     $('roundRows').innerHTML=rows;
+    // settled bets for this round
+    var rb=$('roundBets');rb.innerHTML='';
+    (v.bets||[]).forEach(function(b){
+      if(b.status!=='resolved')return;
+      var line=document.createElement('div');
+      line.style.cssText='font-size:14px;margin:4px 0;font-weight:600;';
+      line.textContent=b.winner===-1
+        ?('🤝 Push — nobody wins: “'+b.text+'”')
+        :('🎲 '+(b.winner===v.you?'You win':v.names[b.winner]+' wins')+' the bet: “'+b.text+'”');
+      if(b.winner===v.you)line.style.color='var(--gold)';
+      rb.appendChild(line);
+    });
     if(mode==='guest'){hide($('btnNext'));show($('waitHost'));}
     else{show($('btnNext'));hide($('waitHost'));}
     show(ov);
@@ -1358,6 +1544,110 @@ function clearSelIfTurnChanged(v){
   if(curView&&curView.turn!==v.turn)clearSel();
   if(v&&v.phase==='draw')clearSel();
 }
+
+/* ---------- stats screen ---------- */
+function showStats(){
+  var s=store.get('rw_stats',freshStats());
+  var games=s.gw+s.gl, wpct=games?Math.round(100*s.gw/games):0;
+  var rows=[
+    ['Games won',s.gw],['Games lost',s.gl],['Win rate',games?(wpct+'%'):'—'],
+    ['vs. Botty 🤖',s.botW+'W – '+s.botL+'L'],
+    ['Rounds won',s.rw],['Rounds lost',s.rl],['Rounds tied',s.rt],
+    ['Bets won 🎲',s.bw],['Bets lost',s.bl]
+  ];
+  var html='';
+  rows.forEach(function(r){html+='<tr><td>'+r[0]+'</td><td style="text-align:right;font-weight:700;">'+r[1]+'</td></tr>';});
+  $('statsRows').innerHTML=html;
+  show($('statsOv'));
+}
+$('btnStats').addEventListener('click',showStats);
+$('btnCloseStats').addEventListener('click',function(){hide($('statsOv'));});
+$('btnResetStats').addEventListener('click',function(){store.set('rw_stats',freshStats());showStats();toast('Stats wiped clean 🧽');});
+
+/* ---------- bets panel (online games only) ---------- */
+function renderBetsPanel(v){
+  var list=$('betsList');list.innerHTML='';
+  var bets=(v&&v.bets)||[];
+  if(!bets.length){
+    var ph=document.createElement('div');
+    ph.style.cssText='opacity:.55;font-size:13.5px;text-align:center;padding:8px 0 14px;';
+    ph.textContent='No bets this round… yet.';
+    list.appendChild(ph);
+  }
+  bets.forEach(function(b){
+    var row=document.createElement('div');
+    row.className='betItem';
+    var txt=document.createElement('div');
+    txt.className='txt';
+    txt.textContent=b.text;
+    var sub=document.createElement('div');
+    sub.style.cssText='font-size:11px;opacity:.6;';
+    sub.textContent='proposed by '+(b.by===v.you?'you':v.names[b.by]);
+    txt.appendChild(sub);
+    row.appendChild(txt);
+    if(b.status==='pending'&&b.by!==v.you){
+      var yes=document.createElement('button');yes.className='btn sm';yes.textContent='✅ Accept';
+      var no=document.createElement('button');no.className='btn sm warn';no.textContent='❌ Deny';
+      yes.addEventListener('click',function(){doAction({k:'betVote',id:b.id,ok:true});});
+      no.addEventListener('click',function(){doAction({k:'betVote',id:b.id,ok:false});});
+      row.appendChild(yes);row.appendChild(no);
+    }else{
+      var tag=document.createElement('span');
+      tag.className='betTag '+b.status;
+      tag.textContent=b.status==='pending'?'waiting…':b.status==='active'?'ON 🤝':b.status==='denied'?'denied':
+        (b.winner===-1?'push':(b.winner===v.you?'you won!':v.names[b.winner]+' won'));
+      row.appendChild(tag);
+    }
+    list.appendChild(row);
+  });
+}
+$('btnBets').addEventListener('click',function(){renderBetsPanel(curView);show($('betsOv'));});
+$('btnCloseBets').addEventListener('click',function(){hide($('betsOv'));});
+$('btnProposeBet').addEventListener('click',function(){
+  var t=$('betInput').value.trim();
+  if(!t){toast('Type what you want to bet first!',true);return;}
+  doAction({k:'betPropose',text:t});
+  $('betInput').value='';
+  if(mode==='guest')setTimeout(function(){renderBetsPanel(curView);},400);
+});
+$('betInput').addEventListener('keydown',function(e){if(e.key==='Enter')$('btnProposeBet').click();});
+
+/* ---------- bet book ---------- */
+function showBetBook(){
+  var book=store.get('rw_bets',[]);
+  var list=$('betBookList');list.innerHTML='';
+  if(!book.length){
+    var ph=document.createElement('div');
+    ph.style.cssText='opacity:.55;font-size:13.5px;text-align:center;padding:10px 0;';
+    ph.textContent='No settled bets yet. Go make some questionable wagers.';
+    list.appendChild(ph);
+  }
+  book.slice().reverse().forEach(function(b){
+    var row=document.createElement('div');
+    row.className='betItem';
+    var txt=document.createElement('div');
+    txt.className='txt';
+    txt.textContent=b.text;
+    var sub=document.createElement('div');
+    sub.style.cssText='font-size:11px;opacity:.6;';
+    var d=new Date(b.ts);
+    sub.textContent='vs '+b.opp+' · round '+b.round+' · '+d.toLocaleDateString();
+    txt.appendChild(sub);
+    row.appendChild(txt);
+    var tag=document.createElement('span');
+    tag.className='betTag '+(b.push?'push':(b.youWon?'won':'lost'));
+    tag.textContent=b.push?'push':(b.youWon?'YOU WON':'you lost');
+    row.appendChild(tag);
+    list.appendChild(row);
+  });
+  show($('betBookOv'));
+}
+$('btnBetBook').addEventListener('click',showBetBook);
+$('btnBetBook2').addEventListener('click',function(){hide($('betsOv'));showBetBook();});
+$('btnCloseBetBook').addEventListener('click',function(){hide($('betBookOv'));});
+$('btnClearBetBook').addEventListener('click',function(){store.set('rw_bets',[]);showBetBook();toast('Bet book cleared — slate wiped 🧽');});
+
+$('btnUndo').addEventListener('click',function(){doAction({k:'undoDraw'});});
 
 /* ---------- deck style (cosmetic only — each player picks their own) ---------- */
 var deckTheme='classic';

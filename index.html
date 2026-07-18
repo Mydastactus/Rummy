@@ -176,9 +176,15 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
   border:1px solid #e2ddcc;
 }
 .card.red{color:var(--card-red);}
-.card .corner{position:absolute; top:5px; left:6px; font-size:15px; font-weight:700; line-height:1; font-family:Georgia,'Times New Roman',serif;}
-.card .corner small{display:block; font-size:13px;}
+.card .corner{position:absolute; top:5px; left:6px; font-size:14px; font-weight:700; line-height:1; font-family:Georgia,'Times New Roman',serif; text-align:center;}
+.card .corner small{display:block; font-size:12px;}
+.card .corner.br{top:auto; left:auto; bottom:5px; right:6px; transform:rotate(180deg);}
 .card .pip{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:28px;}
+.pip.aceBig{font-size:34px;}
+.pipS{position:absolute; font-size:13px; line-height:1; transform:translate(-50%,-50%);}
+.pipS.f{transform:translate(-50%,-50%) rotate(180deg);}
+.faceBox{position:absolute; inset:3px 9px;}
+.faceBox svg{width:100%; height:100%; display:block;}
 .card.clickable{cursor:pointer;}
 .card.clickable:hover{transform:translateY(-10px) rotate(0deg) !important; box-shadow:0 10px 20px rgba(0,0,0,.45); z-index:5;}
 .card.sel{transform:translateY(-12px) !important; border-color:var(--gold); box-shadow:0 0 0 3px var(--gold), 0 10px 20px rgba(0,0,0,.45); z-index:6;}
@@ -208,9 +214,25 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 }
 .back.clickable{cursor:pointer; transition:transform .15s, box-shadow .15s;}
 .back.clickable:hover{transform:translateY(-7px); box-shadow:0 10px 20px rgba(0,0,0,.5);}
-.back .pip{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:22px; color:rgba(230,193,90,.55);}
-.dealAnim{animation:dealIn .32s cubic-bezier(.2,1.3,.4,1);}
+.back .pip{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:0; color:rgba(230,193,90,.55);}
+.back::after{ /* D&R monogram ring */
+  content:'D&R'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:32px; height:32px; border:1.5px solid rgba(230,193,90,.7); border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:Georgia,'Times New Roman',serif; font-size:11px; font-weight:700;
+  color:rgba(230,193,90,.85); letter-spacing:.5px;
+}
+#oppHand .back::after{display:none;}
+.dealAnim{animation:dealIn .32s cubic-bezier(.2,1.3,.4,1) backwards;}
 @keyframes dealIn{from{transform:translateY(36px) scale(.7); opacity:0;}to{opacity:1;}}
+.meldNew{animation:pop .35s cubic-bezier(.2,1.4,.4,1);}
+.scoreChip.turn .ava{animation:turnPulse 1.6s ease-in-out infinite;}
+@keyframes turnPulse{
+  0%,100%{box-shadow:0 0 0 3px rgba(230,193,90,.3);}
+  50%{box-shadow:0 0 0 5px rgba(230,193,90,.55), 0 0 18px rgba(230,193,90,.45);}
+}
+.pts.bump{animation:bump .55s ease-out;}
+@keyframes bump{30%{transform:scale(1.35); color:var(--gold);}}
 
 /* ---------- DECK STYLE PICKER ---------- */
 .deckRow{display:flex; align-items:center; gap:8px; justify-content:center; margin-bottom:12px; font-size:12.5px; color:rgba(242,237,218,.55);}
@@ -246,13 +268,14 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .deck-jungle #handArea .card:not(.red):not(.jokerCard),
 .deck-jungle .card:not(.red):not(.jokerCard){color:#2e5c30;}            /* jungle green */
 .deck-jungle .card::after{
-  position:absolute; bottom:4px; right:5px; font-size:13px; opacity:.9; content:'';
+  position:absolute; top:4px; right:5px; font-size:12px; opacity:.9; content:'';
 }
 .deck-jungle .card[data-suit="S"]::after{content:'🐘';}
 .deck-jungle .card[data-suit="H"]::after{content:'🦜';}
 .deck-jungle .card[data-suit="D"]::after{content:'🐯';}
 .deck-jungle .card[data-suit="C"]::after{content:'🐍';}
-.deck-jungle .card.mini::after{font-size:9px; bottom:2px; right:3px;}
+.deck-jungle .card.mini::after{font-size:9px; top:auto; bottom:2px; right:3px;}
+.deck-jungle .back::after{display:none;}
 .deck-jungle .card.mini.jokerMeld::after{content:'' !important;}        /* badge handles it */
 .deck-jungle .back{
   background:
@@ -301,8 +324,13 @@ input{-webkit-user-select:text; user-select:text;}
 @media (max-width:560px){
   :root{--card-w:50px; --card-h:72px;}
   .card .pip{font-size:21px;}
-  .card .corner{font-size:13px; top:4px; left:5px;}
-  .card .corner small{font-size:11px;}
+  .pip.aceBig{font-size:27px;}
+  .pipS{font-size:10.5px;}
+  .faceBox{inset:2px 7px;}
+  .card .corner{font-size:12px; top:3px; left:4px;}
+  .card .corner small{font-size:10px;}
+  .card .corner.br{top:auto; left:auto; bottom:3px; right:4px;}
+  .back::after{width:26px; height:26px; font-size:9px;}
   .card.mini{--card-w:38px; width:38px; height:56px;}
   .card.mini .pip{font-size:15px;}
   h1{font-size:17px; letter-spacing:3px;} h1 span{font-size:27px; letter-spacing:6px;}
@@ -1038,6 +1066,41 @@ function tiltFor(id){
   var h=0;for(var i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))%1000;
   return ((h%7)-3)*0.35; // whisper of a tilt — keeps cards from feeling stamped
 }
+/* classic pip layouts: [x%, y%, flipped] */
+var PIPS={
+  2:[[50,20],[50,80,1]],
+  3:[[50,20],[50,50],[50,80,1]],
+  4:[[33,21],[67,21],[33,79,1],[67,79,1]],
+  5:[[33,21],[67,21],[50,50],[33,79,1],[67,79,1]],
+  6:[[33,21],[67,21],[33,50],[67,50],[33,79,1],[67,79,1]],
+  7:[[33,21],[67,21],[50,35],[33,50],[67,50],[33,79,1],[67,79,1]],
+  8:[[33,21],[67,21],[50,35],[33,50],[67,50],[50,65,1],[33,79,1],[67,79,1]],
+  9:[[33,19],[67,19],[33,40],[67,40],[50,50],[33,60,1],[67,60,1],[33,81,1],[67,81,1]],
+  10:[[33,19],[67,19],[50,30],[33,40],[67,40],[33,60,1],[67,60,1],[50,70,1],[33,81,1],[67,81,1]]
+};
+function pipSpan(sc,p){
+  return '<span class="pipS'+(p[2]?' f':'')+'" style="left:'+p[0]+'%;top:'+p[1]+'%;">'+sc+'</span>';
+}
+function faceSVG(rank,sc){
+  var motif;
+  if(rank===13){ // king's crown
+    motif='<path d="M15 30 L17 16 L24 24 L30 12 L36 24 L43 16 L45 30 Z" fill="currentColor"/>'
+         +'<rect x="15" y="31" width="30" height="4" rx="2" fill="currentColor"/>';
+  }else if(rank===12){ // queen's tiara
+    motif='<path d="M15 30 Q30 10 45 30" fill="none" stroke="currentColor" stroke-width="3"/>'
+         +'<circle cx="15" cy="30" r="3.2" fill="currentColor"/><circle cx="30" cy="15" r="3.6" fill="currentColor"/>'
+         +'<circle cx="45" cy="30" r="3.2" fill="currentColor"/><circle cx="30" cy="26" r="2.2" fill="currentColor"/>';
+  }else{ // jack's banner
+    motif='<path d="M20 32 L20 12 L43 18 L20 26 Z" fill="currentColor"/>'
+         +'<rect x="17.5" y="10" width="3" height="25" rx="1.5" fill="currentColor"/>';
+  }
+  return '<svg viewBox="0 0 60 84" xmlns="http://www.w3.org/2000/svg">'
+    +'<rect x="2.5" y="2.5" width="55" height="79" rx="5" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".4"/>'
+    +'<g>'+motif+'</g>'
+    +'<g transform="rotate(180 30 42)">'+motif+'</g>'
+    +'<text x="30" y="47.5" font-size="15" text-anchor="middle" fill="currentColor" font-family="Georgia,serif">'+sc+'</text>'
+    +'</svg>';
+}
 function cardEl(c,opts){
   opts=opts||{};
   var d=document.createElement('div');
@@ -1047,10 +1110,20 @@ function cardEl(c,opts){
     d.innerHTML='<div class="corner">🃏</div><div class="pip">🃏</div><div class="wildTag">WILD</div>';
     d.dataset.suit='X';
   }else{
+    var sc=SUITS[c.suit], rn=rankName(c.rank);
     d.className='card'+(RED[c.suit]?' red':'')+(opts.mini?' mini':'')+(opts.anim?' dealAnim':'');
     d.style.transform='rotate('+tiltFor(c.id)+'deg)';
-    d.innerHTML='<div class="corner">'+rankName(c.rank)+'<small>'+SUITS[c.suit]+'</small></div>'
-               +'<div class="pip">'+SUITS[c.suit]+'</div>';
+    var inner;
+    if(opts.mini){
+      inner='<div class="corner">'+rn+'<small>'+sc+'</small></div><div class="pip">'+sc+'</div>';
+    }else{
+      inner='<div class="corner">'+rn+'<small>'+sc+'</small></div>'
+           +'<div class="corner br">'+rn+'<small>'+sc+'</small></div>';
+      if(c.rank===1)inner+='<div class="pip aceBig">'+sc+'</div>';
+      else if(c.rank>=11)inner+='<div class="faceBox">'+faceSVG(c.rank,sc)+'</div>';
+      else inner+=PIPS[c.rank].map(function(p){return pipSpan(sc,p);}).join('');
+    }
+    d.innerHTML=inner;
     d.dataset.suit=c.suit;
   }
   if(opts.click){d.classList.add('clickable');d.addEventListener('click',opts.click);}
@@ -1162,7 +1235,14 @@ function recordProgress(v){
 }
 
 /* ---------- rendering ---------- */
-var prevPendingKey='';
+var prevPendingKey='', prevHandIds={}, prevMeldCount=0;
+function setScore(el,val){
+  var s=''+val;
+  if(el.textContent!==s){
+    el.textContent=s;
+    el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump');
+  }
+}
 function render(v){
   curView=v;
   recordProgress(v);
@@ -1178,9 +1258,11 @@ function render(v){
 
   $('myName').textContent=v.names[v.you];
   $('oppName').textContent=v.names[1-v.you];
-  $('myScore').textContent=v.scores[v.you];
-  $('oppScore').textContent=v.scores[1-v.you];
+  setScore($('myScore'),v.scores[v.you]);
+  setScore($('oppScore'),v.scores[1-v.you]);
   $('roundPill').textContent='Round '+v.round+' · first to 500';
+  document.querySelector('.scoreChip.me').classList.toggle('turn',myTurn);
+  document.querySelector('.scoreChip.opp').classList.toggle('turn',v.turn!==v.you&&!v.roundOver&&!v.gameOver);
 
   // opponent hand
   var oh=$('oppHand');oh.innerHTML='';
@@ -1202,7 +1284,7 @@ function render(v){
   }
   v.melds.forEach(function(m,mi){
     var md=document.createElement('div');
-    md.className='meld'+(canPlay&&selIds().length?' droppable':'');
+    md.className='meld'+(canPlay&&selIds().length?' droppable':'')+(mi>=prevMeldCount?' meldNew':'');
     m.cards.forEach(function(c){
       var el;
       if(c.joker){
@@ -1231,6 +1313,7 @@ function render(v){
     });
     ma.appendChild(md);
   });
+  prevMeldCount=v.melds.length;
 
   // stock
   var sp=$('stockPile');
@@ -1248,16 +1331,29 @@ function render(v){
   dr.scrollLeft=dr.scrollWidth;
 
   // hand — manual order, drag to rearrange (new round starts auto-sorted)
-  if(v.round!==lastRoundSeen){lastRoundSeen=v.round;handOrder=autoSortIds(v.hand);}
+  if(v.round!==lastRoundSeen){
+    lastRoundSeen=v.round;
+    handOrder=autoSortIds(v.hand);
+    prevHandIds={};      // full deal animation
+    prevMeldCount=0;
+  }
   var ha=$('handArea');ha.innerHTML='';
+  var dealIdx=0;
   orderedHand(v.hand).forEach(function(c){
     var el=cardEl(c,{});
     el.dataset.cid=c.id;
     if(sel[c.id])el.classList.add('sel');
     if(v.mustMeld===c.id)el.classList.add('mustGlow');
+    if(!prevHandIds[c.id]){
+      el.classList.add('dealAnim');
+      el.style.animationDelay=(dealIdx*45)+'ms';
+      dealIdx++;
+    }
     attachHandPointer(el,c,canPlay);
     ha.appendChild(el);
   });
+  prevHandIds={};
+  v.hand.forEach(function(c){prevHandIds[c.id]=1;});
 
   // status + buttons
   var st='';
@@ -1449,7 +1545,7 @@ function backToMenu(){
   try{if(conn)conn.close();}catch(e){}
   try{if(peer)peer.destroy();}catch(e){}
   peer=null;conn=null;game=null;mode=null;curView=null;aiRunning=false;
-  handOrder=[];lastRoundSeen=0;
+  handOrder=[];lastRoundSeen=0;prevHandIds={};prevMeldCount=0;prevPendingKey='';
   clearSel();
   hide($('game'));hide($('roundOv'));hide($('waitOv'));hide($('dcOv'));
   show($('menu'));

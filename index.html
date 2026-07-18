@@ -1380,6 +1380,11 @@ $('btnPractice').addEventListener('click',function(){
   startLocalGame([myName,'Botty 🤖'],'ai');
 });
 
+/* offline support — lets the phone keep a downloaded copy of the game */
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  navigator.serviceWorker.register('sw.js').catch(function(){});
+}
+
 /* Enter key conveniences */
 $('codeInput').addEventListener('keydown',function(e){if(e.key==='Enter')$('btnJoin').click();});
 $('nameInput').addEventListener('keydown',function(e){if(e.key==='Enter')$('btnPractice').click();});

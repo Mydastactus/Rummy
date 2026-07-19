@@ -383,9 +383,11 @@ body.deck-lovers{
 .deck-lovers .card.red{color:#a32638;}
 .deck-lovers .card:not(.red):not(.jokerCard){color:#463022;}
 .deck-lovers .back{
-  /* real card-back art when hosted next to index.html; woven gradient as fallback */
+  /* real card-back art when hosted next to index.html (either filename works);
+     woven gradient as fallback if neither loads */
   background:
     url('lovers-back.jpg') center/cover no-repeat,
+    url('lovers-back.jpg.png') center/cover no-repeat,
     repeating-linear-gradient(45deg, rgba(223,185,104,.2) 0 2px, transparent 2px 9px),
     linear-gradient(155deg,#6b2438,#3f1220);
   border-color:#efe6d0;

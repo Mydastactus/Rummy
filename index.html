@@ -1985,6 +1985,9 @@ $('avaFile').addEventListener('change',function(e){
 });
 refreshMenuAva();
 $('nameInput').value=store.get('rw_name','');
+$('nameInput').addEventListener('input',function(){
+  store.set('rw_name',this.value.trim()); // remember the name as it's typed
+});
 
 /* ---------- emotes ---------- */
 var EMOTES=['GG 🤝','Why did you do that?! 🤨','Nice one! 👏','Lucky! 🍀','Ouch 😬','Hurry up ⏳','Oh no no no 😱','😂😂😂','That was MY card! 😤','Rematch! 🔁'];

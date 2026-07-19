@@ -326,13 +326,17 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .deck-jungle .back::after{display:none;}
 .deck-jungle .card.mini.jokerMeld::after{content:'' !important;}        /* badge handles it */
 .deck-jungle .back{
+  /* real card-back art when hosted next to index.html (either filename works);
+     palm-stripe gradient as fallback if neither loads */
   background:
+    url('jungle-back.jpg') center/cover no-repeat,
+    url('jungle-back.jpg.png') center/cover no-repeat,
     repeating-linear-gradient(-45deg, rgba(244,236,190,.14) 0 3px, transparent 3px 11px),
     radial-gradient(circle at 50% 42%, #3f7d3a 0%, #285c2b 55%, #17381c 100%);
   border-color:#efe9d8;
 }
 .deck-jungle .back .pip{font-size:0;}
-.deck-jungle .back .pip::after{content:'🌴'; font-size:22px;}
+.deck-jungle .back .pip::after{display:none;}
 .deck-jungle .card.jokerCard{
   background:linear-gradient(155deg,#fbf7e2 55%,#e9ecc6);
   color:#4a7a2c; border-color:#a9bf74;

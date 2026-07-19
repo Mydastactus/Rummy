@@ -203,6 +203,8 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
   color:#a8831c; border-color:#d8c06a;
 }
 .card.jokerCard .corner small{font-size:10px;}
+.artFace{position:absolute; inset:0; border-radius:7px; background-size:cover; background-position:center;}
+.deck-lovers .card.artCard::before{display:none;} /* the artwork carries its own frame */
 .jkJ,.jkL,.fcL{display:none;}
 .deck-jungle .jkJ{display:inline;}
 .deck-jungle .jkC{display:none;}
@@ -1291,6 +1293,18 @@ function jokerSVG(){
 function cardEl(c,opts){
   opts=opts||{};
   var d=document.createElement('div');
+  // real artwork for royals & aces when the theme has art files hosted (e.g. KH.jpg)
+  if(!opts.mini&&!c.joker&&(c.rank>=11||c.rank===1)&&deckTheme==='lovers'){
+    var artId=rankName(c.rank)+c.suit;
+    if(CARD_ART[artId]){
+      d.className='card artCard'+(RED[c.suit]?' red':'')+(opts.anim?' dealAnim':'');
+      d.style.transform='rotate('+tiltFor(c.id)+'deg)';
+      d.innerHTML='<div class="artFace" style="background-image:url(\''+artId+'.jpg\')"></div>';
+      d.dataset.suit=c.suit;
+      if(opts.click){d.classList.add('clickable');d.addEventListener('click',opts.click);}
+      return d;
+    }
+  }
   if(c.joker){
     d.className='card jokerCard'+(opts.mini?' mini':'')+(opts.anim?' dealAnim':'');
     d.style.transform='rotate('+tiltFor(c.id)+'deg)';
@@ -2045,6 +2059,17 @@ var DECK_THEMES=[
   {id:'lovers',  label:'💞 Lovers',  floats:['♥','❦','🌹','♥','♦']}
 ];
 var deckTheme='classic';
+/* face-card artwork: quietly probe for art files next to index.html;
+   any that exist get used, any that don't keep the drawn design */
+var CARD_ART={};
+(function(){
+  var ids=['KH','QH','JH','KS','QS','JS','KD','QD','JD','KC','QC','JC','AS','AH','AD','AC'];
+  ids.forEach(function(id){
+    var im=new Image();
+    im.onload=function(){CARD_ART[id]=true;if(curView)render(curView);};
+    im.src=id+'.jpg';
+  });
+})();
 function renderFloats(theme){
   var bg=$('bgFloat');bg.innerHTML='';
   for(var i=0;i<10;i++){
@@ -2067,6 +2092,7 @@ function setDeck(id){
   renderFloats(theme);
   var opts=$('deckOpts').children;
   for(var i=0;i<opts.length;i++)opts[i].classList.toggle('active',opts[i].dataset.theme===id);
+  if(curView)render(curView); // card faces can differ per theme (art vs drawn)
 }
 (function(){
   var wrap=$('deckOpts');

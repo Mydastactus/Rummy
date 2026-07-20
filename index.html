@@ -92,6 +92,27 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .joinRow{display:flex; gap:10px; margin-bottom:12px;}
 .joinRow input{flex:1; margin:0; text-transform:uppercase; letter-spacing:5px; font-weight:800;}
 
+/* ---------- HERO TITLE SCREEN (when menu-art is hosted next to index.html) ---------- */
+.hasMenuArt #menu{gap:16px; padding-top:calc(18px + env(safe-area-inset-top));}
+.hasMenuArt #menu::before{ /* the carved-logo hero banner */
+  content:''; flex:none;
+  width:min(720px,94vw); height:clamp(170px, 34vh, 330px);
+  background:
+    url('menu-art.jpg') center 45%/cover no-repeat,
+    url('menu-art.jpg.png') center 45%/cover no-repeat;
+  border-radius:20px; border:1px solid rgba(223,185,104,.4);
+  box-shadow:0 24px 60px rgba(0,0,0,.55), inset 0 0 0 1px rgba(0,0,0,.3);
+  animation:pop .5s cubic-bezier(.2,1.4,.4,1);
+}
+.hasMenuArt .menu-card{
+  background:rgba(5,17,10,.6); backdrop-filter:blur(10px);
+  border-color:rgba(255,255,255,.14);
+  padding:20px 26px 22px;
+}
+.hasMenuArt .logo, .hasMenuArt h1, .hasMenuArt .tagline{display:none;} /* the carving IS the title */
+.hasMenuArt #avaPick{margin-bottom:10px;}
+.hasMenuArt .menu-card .btn.big{margin-bottom:10px; padding:12px 18px;}
+
 /* ---------- OVERLAYS ---------- */
 .overlay{
   position:fixed; inset:0; z-index:50; display:flex; align-items:center; justify-content:center;
@@ -2073,6 +2094,12 @@ var deckTheme='classic';
 /* face-card artwork: quietly probe for art files next to index.html;
    any that exist get used, any that don't keep the drawn design */
 var CARD_ART={};
+/* hero title screen art: use it if it's hosted, keep the text logo if not */
+['menu-art.jpg','menu-art.jpg.png'].forEach(function(src){
+  var im=new Image();
+  im.onload=function(){document.body.classList.add('hasMenuArt');};
+  im.src=src;
+});
 (function(){
   var ids=['KH','QH','JH','KS','QS','JS','KD','QD','JD','KC','QC','JC','AS','AH','AD','AC'];
   ids.forEach(function(id){

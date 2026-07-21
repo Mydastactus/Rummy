@@ -306,6 +306,14 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .betTag.resolved,.betTag.won{color:var(--gold); border-color:var(--gold-dim);}
 .betTag.push{color:rgba(242,237,218,.6); border-color:rgba(255,255,255,.25);}
 .btn.sm{padding:7px 11px; font-size:12.5px; border-radius:9px;}
+#resumeRow{margin-bottom:12px;}
+#resumeRow .btn.big{background:linear-gradient(180deg,#7fd8a4,#4da878); color:#0c2b1a; margin-bottom:2px;}
+#netStatus{
+  position:fixed; top:calc(60px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+  z-index:75; background:rgba(56,42,10,.95); border:1px solid rgba(230,193,90,.55);
+  color:#f4dc9a; font-size:12.5px; font-weight:600; border-radius:999px; padding:7px 16px;
+  max-width:92vw; text-align:center; animation:pop .3s;
+}
 #btnRummy{animation:rummyPulse 1s ease-in-out infinite;}
 @keyframes rummyPulse{
   0%,100%{box-shadow:0 0 0 0 rgba(207,90,78,.65), 0 2px 10px rgba(0,0,0,.35);}
@@ -543,6 +551,10 @@ input{-webkit-user-select:text; user-select:text;}
       <input type="file" id="avaFile" accept="image/*" class="hidden">
     </div>
     <input id="nameInput" placeholder="Your name" maxlength="14">
+    <div id="resumeRow" class="hidden">
+      <button class="btn big" id="btnResume">▶️ Resume game</button>
+      <button class="linkBtn" id="btnForget">abandon saved game</button>
+    </div>
     <button class="btn big" id="btnCreate">🌐 Create an online table</button>
     <div class="joinRow">
       <input id="codeInput" placeholder="CODE" maxlength="4">
@@ -714,6 +726,7 @@ input{-webkit-user-select:text; user-select:text;}
 </div>
 <div id="emoteLayer"></div>
 
+<div id="netStatus" class="hidden"></div>
 <div id="toasts"></div>
 <div id="confetti"></div>
 
@@ -1121,6 +1134,20 @@ Game.prototype.endRound=function(reason,p){
   }
   this.ev(reason==='out'?(this.names[p]+' went out! 🏁'):'The deck ran out — round over!');
 };
+Game.prototype.snapshot=function(){
+  return {
+    names:this.names, scores:this.scores, round:this.round, dealer:this.dealer,
+    gameOver:this.gameOver, events:this.events, roundOver:this.roundOver, gid:this.gid,
+    bets:this.bets, betSeq:this.betSeq, undo:this.undo, rummyCall:this.rummyCall,
+    hands:this.hands, discard:this.discard, stock:this.stock, melds:this.melds,
+    turn:this.turn, phase:this.phase, mustMeld:this.mustMeld
+  };
+};
+function restoreGame(snap){
+  var g=new Game(snap.names||['A','B']);
+  for(var k in snap)if(Object.prototype.hasOwnProperty.call(snap,k))g[k]=snap[k];
+  return g;
+}
 Game.prototype.viewFor=function(p){
   return {
     you:p, names:this.names, scores:this.scores.slice(), round:this.round,
@@ -1521,6 +1548,7 @@ function doAction(a){
 function syncAll(){
   if(mode==='host'&&conn&&conn.open)conn.send({t:'state',v:game.viewFor(1)});
   if(mode!=='guest')render(game.viewFor(0));
+  if(mode==='host')saveSession(); // every move survives a dead battery
   if(mode==='ai')maybeRunAI();
 }
 function maybeRunAI(){
@@ -1897,14 +1925,18 @@ $('btnDiscard').addEventListener('click',function(){
   doAction({k:'discard',id:selIds()[0]});
 });
 function backToMenu(){
-  try{if(conn)conn.close();}catch(e){}
-  try{if(peer)peer.destroy();}catch(e){}
-  peer=null;conn=null;game=null;mode=null;curView=null;aiRunning=false;
+  clearTimeout(reconnectTimer);
+  if((game&&game.gameOver)||(curView&&curView.gameOver))store.set('rw_save',null);
+  destroyPeer();
+  setNetStatus(null);
+  sessionCode=null;
+  game=null;mode=null;curView=null;aiRunning=false;
   handOrder=[];lastRoundSeen=0;prevHandIds={};prevMeldCount=0;prevPendingKey='';
   oppHat='';oppAvatarData=null;
   clearSel();
   hide($('game'));hide($('roundOv'));hide($('waitOv'));hide($('dcOv'));
   show($('menu'));
+  renderResumeRow();
 }
 $('btnQuit').addEventListener('click',backToMenu);
 $('btnCancelWait').addEventListener('click',backToMenu);
@@ -1934,43 +1966,197 @@ function getName(fallback){
   if(n)store.set('rw_name',n);
   return n||fallback;
 }
-function createTable(){
-  var code=randCode();
-  $('codeShow').textContent=code;
+/* ---------- resilient session networking: auto-reconnect + resume ---------- */
+var sessionCode=null, reconnectTimer=null, reconnectTries=0, tearingDown=false;
+function setNetStatus(txt){
+  var el=$('netStatus');
+  if(!txt)el.classList.add('hidden');
+  else{el.textContent='🔌 '+txt;el.classList.remove('hidden');}
+}
+function destroyPeer(){
+  tearingDown=true;
+  try{if(conn)conn.close();}catch(e){}
+  try{if(peer)peer.destroy();}catch(e){}
+  conn=null;peer=null;
+  tearingDown=false;
+}
+function saveSession(){
+  if(mode==='host'&&game){
+    if(game.gameOver){store.set('rw_save',null);return;}
+    store.set('rw_save',{role:'host',code:sessionCode,myName:myName,oppName:game.names[1],
+      ts:Date.now(),snap:game.snapshot(),oppAva:oppAvatarData,
+      recorded:{r:recordedRounds,g:recordedGames}});
+  }
+}
+function connLost(){
+  if(tearingDown)return;
+  if(mode!=='host'&&mode!=='guest')return;
+  conn=null;
+  if((game&&game.gameOver)||(curView&&curView.gameOver))return;
+  setNetStatus('connection lost — reconnecting…');
+  scheduleReconnect(2500);
+}
+function scheduleReconnect(delay){
+  clearTimeout(reconnectTimer);
+  reconnectTimer=setTimeout(attemptReconnect,delay);
+}
+function attemptReconnect(){
+  if(!sessionCode||(mode!=='host'&&mode!=='guest'))return;
+  if(conn&&conn.open){setNetStatus(null);return;}
+  reconnectTries++;
+  if(reconnectTries>60){setNetStatus("couldn't reconnect — both open the app and tap Resume on the menu");return;}
+  if(mode==='host'){
+    hostListen(sessionCode);
+    setNetStatus('waiting for '+(game?game.names[1]:'your opponent')+' to reconnect… (table '+sessionCode+')');
+  }else{
+    guestConnect(sessionCode,true);
+    setNetStatus('reconnecting to the table…');
+  }
+}
+function hostListen(code){
+  sessionCode=code;
+  destroyPeer();
   peer=new Peer(PFX+code);
   peer.on('error',function(err){
     if(err&&err.type==='unavailable-id'){
-      // rare code collision — grab a new one and rewire everything
-      try{peer.destroy();}catch(e){}
-      createTable();
-    }else friendlyPeerError(err);
+      if(game){setNetStatus('reclaiming the table…');scheduleReconnect(4000);}
+      else{var c2=randCode();$('codeShow').textContent=c2;hostListen(c2);}
+    }else if(err&&(err.type==='network'||err.type==='server-error'||err.type==='socket-error'||err.type==='socket-closed')){
+      if(game){setNetStatus('no connection — retrying…');scheduleReconnect(5000);}
+      else friendlyPeerError(err);
+    }else if(!game)friendlyPeerError(err);
   });
+  peer.on('disconnected',function(){try{peer.reconnect();}catch(e){}});
   peer.on('connection',function(c){
-    if(conn){try{c.close();}catch(e){} return;}
+    if(conn&&conn.open){try{c.close();}catch(e){}return;}
     conn=c;
-    conn.on('data',function(msg){
-      if(msg&&msg.t==='hello'&&!game){
-        oppAvatarData=validAva(msg.ava)?msg.ava:null;
-        conn.send({t:'meta',ava:store.get('rw_avatar',null)});
-        startLocalGame([myName,(msg.name||'Bear 🐻')],'host');
-      }else if(msg&&msg.t==='emote'){
-        if(EMOTES.indexOf(msg.text)>=0)showBubble(game?game.names[1]:'Friend',msg.text,false);
-      }else if(msg&&msg.t==='act'&&game){
-        var err=applyAction(msg.a,1);
-        if(err){if(conn.open)conn.send({t:'err',m:err});}
-        else syncAll();
-      }
-    });
-    conn.on('close',function(){
-      if(game&&!game.gameOver){show($('dcOv'));}
-    });
+    conn.on('data',hostOnData);
+    conn.on('close',connLost);
+    conn.on('error',function(){});
   });
 }
+function hostOnData(msg){
+  if(!msg)return;
+  if(msg.t==='hello'){
+    oppAvatarData=validAva(msg.ava)?msg.ava:null;
+    if(conn&&conn.open)conn.send({t:'meta',ava:store.get('rw_avatar',null)});
+    reconnectTries=0;
+    if(!game){
+      startLocalGame([myName,(msg.name||'Bear 🐻')],'host');
+    }else{ // a reconnecting opponent — hand them the game right where it was
+      setNetStatus(null);
+      toast(game.names[1]+' is back! 🔌');
+      refreshAvatars();
+      syncAll();
+    }
+  }else if(msg.t==='emote'){
+    if(EMOTES.indexOf(msg.text)>=0)showBubble(game?game.names[1]:'Friend',msg.text,false);
+  }else if(msg.t==='act'&&game){
+    var err=applyAction(msg.a,1);
+    if(err){if(conn&&conn.open)conn.send({t:'err',m:err});}
+    else syncAll();
+  }
+}
+function guestConnect(code,resuming){
+  sessionCode=code;
+  mode='guest';
+  destroyPeer();
+  peer=new Peer();
+  peer.on('error',function(err){
+    if(err&&err.type==='peer-unavailable'){
+      if(resuming){setNetStatus('waiting for '+((store.get('rw_save',null)||{}).oppName||'the host')+' to open the app…');scheduleReconnect(5000);}
+      else toast('No table found with that code — double-check it! 🔍',true);
+    }else if(err&&(err.type==='network'||err.type==='server-error'||err.type==='socket-error'||err.type==='socket-closed')){
+      if(resuming||curView){setNetStatus('no connection — retrying…');scheduleReconnect(5000);}
+      else friendlyPeerError(err);
+    }
+  });
+  peer.on('open',function(){
+    conn=peer.connect(PFX+code,{reliable:true});
+    conn.on('open',function(){
+      reconnectTries=0;
+      setNetStatus(null);
+      conn.send({t:'hello',name:myName,ava:store.get('rw_avatar',null)});
+      myAvaEmoji='🐻';oppAvaEmoji='🐂';
+      refreshAvatars();
+    });
+    conn.on('data',guestOnData);
+    conn.on('close',connLost);
+    conn.on('error',function(){});
+  });
+}
+function guestOnData(msg){
+  if(!msg)return;
+  if(msg.t==='state'){
+    clearSelIfTurnChanged(msg.v);
+    render(msg.v);
+    if(msg.v.gameOver)store.set('rw_save',null);
+    else store.set('rw_save',{role:'guest',code:sessionCode,myName:myName,oppName:msg.v.names[0],
+      ts:Date.now(),lastView:msg.v,recorded:{r:recordedRounds,g:recordedGames}});
+  }
+  else if(msg.t==='meta'){oppAvatarData=validAva(msg.ava)?msg.ava:null;refreshAvatars();}
+  else if(msg.t==='emote'){if(EMOTES.indexOf(msg.text)>=0)showBubble(curView?curView.names[1-curView.you]:'Friend',msg.text,false);}
+  else if(msg.t==='err'){toast(msg.m,true);}
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'&&(mode==='host'||mode==='guest')&&!(conn&&conn.open)){
+    reconnectTries=0;
+    attemptReconnect();
+  }
+});
+
+/* ---------- resume a saved game from the menu ---------- */
+function renderResumeRow(){
+  var s=store.get('rw_save',null);
+  var ok=!!(s&&s.code&&((s.role==='host'&&s.snap&&!s.snap.gameOver)||(s.role==='guest'&&s.lastView&&!s.lastView.gameOver)));
+  $('resumeRow').classList.toggle('hidden',!ok);
+  if(ok){
+    var scoreTxt=s.role==='host'
+      ?' ('+s.snap.scores[0]+'–'+s.snap.scores[1]+')'
+      :' ('+s.lastView.scores[s.lastView.you]+'–'+s.lastView.scores[1-s.lastView.you]+')';
+    $('btnResume').textContent='▶️ Resume vs '+(s.oppName||'your opponent')+scoreTxt;
+  }
+}
+$('btnResume').addEventListener('click',function(){
+  var s=store.get('rw_save',null);
+  if(!s||!s.code)return;
+  if(typeof Peer==='undefined'){noPeerMsg();return;}
+  myName=s.myName||getName('You');
+  if(s.recorded){recordedRounds=s.recorded.r||{};recordedGames=s.recorded.g||{};}
+  reconnectTries=0;
+  hide($('menu'));show($('game'));
+  if(s.role==='host'){
+    mode='host';
+    game=restoreGame(s.snap);
+    myAvaEmoji='🐂';oppAvaEmoji='🐻';oppHat='';
+    oppAvatarData=validAva(s.oppAva)?s.oppAva:null;
+    refreshAvatars();
+    render(game.viewFor(0));
+    hostListen(s.code);
+    setNetStatus('waiting for '+game.names[1]+' to reconnect… (table '+s.code+')');
+  }else{
+    myAvaEmoji='🐻';oppAvaEmoji='🐂';oppHat='';
+    refreshAvatars();
+    if(s.lastView)render(s.lastView);
+    guestConnect(s.code,true);
+    setNetStatus('reconnecting to the table…');
+  }
+});
+$('btnForget').addEventListener('click',function(){
+  store.set('rw_save',null);
+  renderResumeRow();
+  toast('Saved game abandoned 🗑️');
+});
+renderResumeRow();
+
 $('btnCreate').addEventListener('click',function(){
   if(typeof Peer==='undefined'){noPeerMsg();return;}
   myName=getName('Bull 🐂');
+  var code=randCode();
+  $('codeShow').textContent=code;
   show($('waitOv'));
-  createTable();
+  reconnectTries=0;
+  hostListen(code);
 });
 $('btnJoin').addEventListener('click',function(){
   if(typeof Peer==='undefined'){noPeerMsg();return;}
@@ -1978,26 +2164,8 @@ $('btnJoin').addEventListener('click',function(){
   var code=$('codeInput').value.trim().toUpperCase();
   if(code.length!==4){toast('Enter the 4-letter table code first!',true);return;}
   toast('Joining table '+code+'… 🚪');
-  peer=new Peer();
-  peer.on('error',friendlyPeerError);
-  peer.on('open',function(){
-    conn=peer.connect(PFX+code,{reliable:true});
-    conn.on('open',function(){
-      mode='guest';
-      conn.send({t:'hello',name:myName,ava:store.get('rw_avatar',null)});
-      myAvaEmoji='🐻'; oppAvaEmoji='🐂';
-      refreshAvatars();
-    });
-    conn.on('data',function(msg){
-      if(msg&&msg.t==='state'){clearSelIfTurnChanged(msg.v);render(msg.v);}
-      else if(msg&&msg.t==='meta'){oppAvatarData=validAva(msg.ava)?msg.ava:null;refreshAvatars();}
-      else if(msg&&msg.t==='emote'){if(EMOTES.indexOf(msg.text)>=0)showBubble(curView?curView.names[1-curView.you]:'Friend',msg.text,false);}
-      else if(msg&&msg.t==='err'){toast(msg.m,true);}
-    });
-    conn.on('close',function(){
-      if(mode==='guest'&&curView&&!(curView.gameOver)){show($('dcOv'));}
-    });
-  });
+  reconnectTries=0;
+  guestConnect(code,false);
 });
 function clearSelIfTurnChanged(v){
   if(curView&&curView.turn!==v.turn)clearSel();

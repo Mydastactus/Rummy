@@ -179,6 +179,13 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(230,193,90,.45);}50%{box-shadow:0 0 0 7px rgba(230,193,90,0);}}
 
 #pilesArea{display:flex; align-items:flex-end; gap:18px; margin-bottom:10px;}
+/* the deck gets showcase size — let the back art breathe */
+#stockPile.back{
+  width:calc(var(--card-w)*1.45); height:calc(var(--card-h)*1.45);
+  border-radius:11px;
+  box-shadow:3px 3px 0 rgba(0,0,0,.22), 6px 6px 0 rgba(0,0,0,.15), 0 6px 16px rgba(0,0,0,.45);
+}
+#stockPile.back::after{width:44px; height:44px; font-size:14px;}
 #stockWrap{text-align:center; flex:none;}
 #stockCount{font-size:11px; font-weight:600; color:rgba(242,237,218,.55); margin-top:5px; letter-spacing:.4px;}
 #discardWrap{flex:1; min-width:0;}
@@ -312,6 +319,27 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .avaBig.photo{border-style:solid;}
 .linkBtn{background:none; border:none; color:var(--gold); font:inherit; font-size:11.5px; cursor:pointer; text-decoration:underline; padding:2px; margin-top:2px;}
 .ava{background-size:cover; background-position:center;}
+/* bot picker + hat avatars */
+.botRow{
+  display:flex; align-items:center; gap:12px; text-align:left;
+  background:rgba(255,255,255,.05); border:1px solid var(--line); border-radius:12px;
+  padding:10px 14px; margin-bottom:8px; cursor:pointer;
+  transition:border-color .15s, background .15s, transform .12s;
+}
+.botRow:hover{border-color:var(--gold); background:rgba(230,193,90,.08); transform:translateX(3px);}
+.botAva{
+  position:relative; width:46px; height:46px; border-radius:50%; flex:none;
+  background:rgba(0,0,0,.32); border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; font-size:25px;
+}
+.hatE{position:absolute; top:-10px; left:50%; transform:translateX(-50%); font-size:17px; line-height:1; pointer-events:none;}
+.hatE.cowboy{font-size:30px; top:-15px; clip-path:inset(0 0 55% 0);}
+.botName{font-weight:700; font-size:15px;}
+.botDesc{font-size:12px; opacity:.6;}
+.botPips{margin-left:auto; color:var(--gold); letter-spacing:2px; font-size:11px; flex:none;}
+.ava{position:relative; overflow:visible;}
+.ava .hatE{font-size:13px; top:-8px;}
+.ava .hatE.cowboy{font-size:22px; top:-11px; clip-path:inset(0 0 55% 0);}
 #emoteGrid{display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin:6px 0 10px;}
 .emoteBtn{
   font:inherit; font-size:13.5px; font-weight:600; cursor:pointer;
@@ -656,6 +684,16 @@ input{-webkit-user-select:text; user-select:text;}
     <div id="betBookList" style="text-align:left; max-height:50vh; overflow-y:auto;"></div>
     <button class="btn big" id="btnCloseBetBook">Close</button>
     <button class="btn ghost" id="btnClearBetBook">Clear history</button>
+  </div>
+</div>
+
+<!-- ============ BOT PICKER ============ -->
+<div class="overlay hidden" id="botOv">
+  <div class="ov-card">
+    <h2>🤖 Choose your opponent</h2>
+    <p style="font-size:12.5px; opacity:.6; margin:2px 0 12px;">Five bots, five hats, five levels of trouble.</p>
+    <div id="botList"></div>
+    <button class="btn ghost" id="btnCloseBots" style="margin-top:4px;">← Back</button>
   </div>
 </div>
 
@@ -1110,19 +1148,32 @@ function aiUsefulness(card,hand){
   }
   return u;
 }
-function aiStep(game){
+function fitsAnyMeld(card,melds){
+  for(var i=0;i<melds.length;i++){
+    var m=melds[i], comb=m.cards.concat([card]);
+    if(m.type==='set'?validSet(comb):validRun(comb))return true;
+  }
+  return false;
+}
+function aiStep(game,skill){
   // Performs ONE visible action for player 1 and returns a short description,
   // or null when the turn is finished / round over.
+  // `skill` tunes the bot; omitted = the standard (Botty) brain.
+  skill=skill||{};
+  var digDepth=skill.digDepth!==undefined?skill.digDepth:4;
+  var meldChance=skill.meldChance!==undefined?skill.meldChance:1;
   if(game.roundOver||game.gameOver||game.turn!==1)return null;
   var hand=game.hands[1],i,j;
   if(game.phase==='draw'){
-    var pile=game.discard;
     var bestIdx=-1;
-    for(i=0;i<pile.length;i++){
-      var junk=pile.length-1-i;
-      if(junk>4)continue;
-      var pool=hand.concat(pile.slice(i));
-      if(canUseCard(pile[i],pool,game.melds)){bestIdx=i;break;}
+    if(skill.dig!==false){
+      var pile=game.discard;
+      for(i=0;i<pile.length;i++){
+        var junk=pile.length-1-i;
+        if(junk>digDepth)continue;
+        var pool=hand.concat(pile.slice(i));
+        if(canUseCard(pile[i],pool,game.melds)){bestIdx=i;break;}
+      }
     }
     if(bestIdx>=0){game.drawDiscard(1,bestIdx);return 'draw';}
     game.drawStock(1);
@@ -1151,40 +1202,58 @@ function aiStep(game){
     // should not happen; fall through
   }
   // grab an opponent joker off the table if we hold its real card
-  for(var sm=0;sm<game.melds.length;sm++){
-    var jk2=null,mc=game.melds[sm].cards;
-    for(i=0;i<mc.length;i++)if(mc[i].joker)jk2=mc[i];
-    if(jk2&&jk2.by!==1){
-      var need=jk2.as.suit+jk2.as.rank,have=false;
-      for(i=0;i<hand.length;i++)if(hand[i].id===need)have=true;
-      if(have&&game.swapJoker(1,sm)===null)return 'swap';
+  if(skill.swap!==false){
+    for(var sm=0;sm<game.melds.length;sm++){
+      var jk2=null,mc=game.melds[sm].cards;
+      for(i=0;i<mc.length;i++)if(mc[i].joker)jk2=mc[i];
+      if(jk2&&jk2.by!==1){
+        var need=jk2.as.suit+jk2.as.rank,have=false;
+        for(i=0;i<hand.length;i++)if(hand[i].id===need)have=true;
+        if(have&&game.swapJoker(1,sm)===null)return 'swap';
+      }
     }
   }
-  // meld best candidate
-  var cands2=aiFindMelds(hand).filter(validCand);
-  if(cands2.length){
-    cands2.sort(function(a,b){return meldPoints(b)-meldPoints(a);});
-    game.meld(1,cands2[0].map(function(c){return c.id;}));
-    return 'meld';
+  // meld best candidate (rookies sometimes sit on their cards)
+  if(Math.random()<meldChance){
+    var cands2=aiFindMelds(hand).filter(validCand);
+    if(cands2.length){
+      cands2.sort(function(a,b){return meldPoints(b)-meldPoints(a);});
+      game.meld(1,cands2[0].map(function(c){return c.id;}));
+      return 'meld';
+    }
   }
   // lay off single cards
-  for(i=0;i<hand.length;i++){
-    for(j=0;j<game.melds.length;j++){
-      var m=game.melds[j], comb2=m.cards.concat([hand[i]]);
-      if(m.type==='set'?validSet(comb2):validRun(comb2)){
-        game.layoff(1,[hand[i].id],j);
-        return 'layoff';
+  if(skill.layoff!==false){
+    for(i=0;i<hand.length;i++){
+      for(j=0;j<game.melds.length;j++){
+        var m=game.melds[j], comb2=m.cards.concat([hand[i]]);
+        if(m.type==='set'?validSet(comb2):validRun(comb2)){
+          game.layoff(1,[hand[i].id],j);
+          return 'layoff';
+        }
       }
     }
   }
   if(!hand.length)return null; // went out via meld
-  // discard: least useful, highest value — never a joker unless it's all we have
+  // discard: never a joker unless it's all we have
   var pool2=hand.filter(function(c){return !c.joker;});
   if(!pool2.length)pool2=hand;
-  var worst=pool2[0],worstScore=-1e9;
-  for(i=0;i<pool2.length;i++){
-    var sc=cardValue(pool2[i].rank)-aiUsefulness(pool2[i],hand)*4;
-    if(sc>worstScore){worstScore=sc;worst=pool2[i];}
+  var worst;
+  if(skill.discard==='random'){
+    worst=pool2[Math.floor(Math.random()*pool2.length)];
+  }else{
+    var cands3=pool2;
+    if(skill.discard==='safe'||skill.discard==='sharp'){
+      // don't gift the player a lay-off
+      var safe=pool2.filter(function(c){return !fitsAnyMeld(c,game.melds);});
+      if(safe.length)cands3=safe;
+    }
+    var wU=skill.discard==='sharp'?5.5:4;
+    worst=cands3[0];var worstScore=-1e9;
+    for(i=0;i<cands3.length;i++){
+      var sc=cardValue(cands3[i].rank)-aiUsefulness(cands3[i],hand)*wU;
+      if(sc>worstScore){worstScore=sc;worst=cands3[i];}
+    }
   }
   game.discardCard(1,worst.id);
   return 'discard';
@@ -1404,7 +1473,7 @@ function maybeRunAI(){
   (function tick(){
     setTimeout(function(){
       if(!game){aiRunning=false;return;}
-      var r=aiStep(game);
+      var r=aiStep(game,currentBot?currentBot.skill:null);
       steps++;
       render(game.viewFor(0));
       if(r===null||steps>40||game.turn===0||game.roundOver||game.gameOver){
@@ -1493,7 +1562,7 @@ function render(v){
   var backs=Math.min(v.oppCount,13);
   for(var i=0;i<backs;i++){
     var b=document.createElement('div');
-    b.className='back';b.style.height='58px';b.style.width='40px';b.style.borderWidth='2px';
+    b.className='back';b.style.height='68px';b.style.width='47px';b.style.borderWidth='2px';
     oh.appendChild(b);
   }
   $('oppCount').textContent=v.oppCount+' cards';
@@ -1750,6 +1819,7 @@ function startLocalGame(names,asMode){
   hide($('waitOv'));
   myAvaEmoji='🐂';
   oppAvaEmoji=mode==='ai'?'🤖':'🐻';
+  oppHat=mode==='ai'?currentBot.hat:'';
   if(mode==='ai')oppAvatarData=null;
   refreshAvatars();
   syncAll();
@@ -1772,6 +1842,7 @@ function backToMenu(){
   try{if(peer)peer.destroy();}catch(e){}
   peer=null;conn=null;game=null;mode=null;curView=null;aiRunning=false;
   handOrder=[];lastRoundSeen=0;prevHandIds={};prevMeldCount=0;prevPendingKey='';
+  oppHat='';oppAvatarData=null;
   clearSel();
   hide($('game'));hide($('roundOv'));hide($('waitOv'));hide($('dcOv'));
   show($('menu'));
@@ -1978,14 +2049,39 @@ $('btnClearBetBook').addEventListener('click',function(){store.set('rw_bets',[])
 
 $('btnUndo').addEventListener('click',function(){doAction({k:'undoDraw'});});
 
+/* ---------- the bot roster (practice opponents) ---------- */
+var BOTS=[
+  {id:'rusty', name:'Rusty 🧢',      hat:'🧢',     tier:1, desc:'Fresh off the assembly line. Forgets to meld.',
+   skill:{dig:false, layoff:false, swap:false, meldChance:0.55, discard:'random'},
+   replies:['Uhh… beep? 🤖','Was that good?','I meant to do that!','🧢','Which ones are the hearts again?']},
+  {id:'botty', name:'Botty 🤖',      hat:'',       tier:2, desc:'The original. Steady hands, no drama.',
+   skill:{},
+   replies:['Beep. 🤖','Calculated. 😎','GG 🤝','My circuits made me do it 🤷','😂']},
+  {id:'tex',   name:'Tex 🤠',        hat:'cowboy', tier:3, desc:'Quick draw. Never gifts you a lay-off.',
+   skill:{digDepth:5, discard:'safe'},
+   replies:['Yeehaw! 🤠','This town ain\'t big enough, partner.','Draw! …from the deck, I mean.','Tip o\' the hat to ya 🤠']},
+  {id:'prof',  name:'Professor 🎓',  hat:'🎓',     tier:4, desc:'Digs deep and plays the percentages.',
+   skill:{digDepth:6, discard:'sharp'},
+   replies:['Fascinating. 🎓','As I hypothesized.','Textbook, really.','Have you read my paper on deadwood theory?']},
+  {id:'ace',   name:'Ace 👑',        hat:'👑',     tier:5, desc:'Ruthless. Digs deeper, wastes nothing.',
+   skill:{digDepth:9, discard:'sharp'},
+   replies:['👑','Bow before the crown.','All part of the plan.','You blinked. I melded.','GG. Naturally.']}
+];
+var currentBot=BOTS[1];
+
 /* ---------- photo avatars ---------- */
-var myAvaEmoji='🐂', oppAvaEmoji='🐻', oppAvatarData=null;
+var myAvaEmoji='🐂', oppAvaEmoji='🐻', oppHat='', oppAvatarData=null;
 function validAva(a){
   return typeof a==='string'
     && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(a)
     && a.length<150000;
 }
-function applyAva(el,data,emoji){
+function hatSpan(hat){
+  if(!hat)return '';
+  if(hat==='cowboy')return '<span class="hatE cowboy">🤠</span>';
+  return '<span class="hatE">'+hat+'</span>';
+}
+function applyAva(el,data,emoji,hat){
   if(validAva(data)){
     el.textContent='';
     el.style.backgroundImage="url('"+data+"')";
@@ -1993,12 +2089,13 @@ function applyAva(el,data,emoji){
   }else{
     el.style.backgroundImage='';
     el.classList.remove('photo');
-    el.textContent=emoji;
+    if(hat)el.innerHTML=hatSpan(hat)+emoji;
+    else el.textContent=emoji;
   }
 }
 function refreshAvatars(){
-  applyAva($('myAva'),store.get('rw_avatar',null),myAvaEmoji);
-  applyAva($('oppAva'),oppAvatarData,oppAvaEmoji);
+  applyAva($('myAva'),store.get('rw_avatar',null),myAvaEmoji,'');
+  applyAva($('oppAva'),oppAvatarData,oppAvaEmoji,oppHat);
 }
 function refreshMenuAva(){
   var a=store.get('rw_avatar',null);
@@ -2063,8 +2160,10 @@ function sendEmote(text){
   showBubble('you',text,true);
   if((mode==='host'||mode==='guest')&&conn&&conn.open)conn.send({t:'emote',text:text});
   if(mode==='ai'&&Math.random()<0.65){
+    var reps=(currentBot&&currentBot.replies)||BOTTY_REPLIES;
+    var who=(currentBot&&currentBot.name)||'Botty 🤖';
     setTimeout(function(){
-      showBubble('Botty 🤖',BOTTY_REPLIES[Math.floor(Math.random()*BOTTY_REPLIES.length)],false);
+      showBubble(who,reps[Math.floor(Math.random()*reps.length)],false);
     },1400);
   }
 }
@@ -2152,11 +2251,34 @@ $('btnDeck').addEventListener('click',function(){
   toast(next.label+' deck!');
 });
 
-/* ---------- practice ---------- */
-$('btnPractice').addEventListener('click',function(){
-  myName=getName('You');
-  startLocalGame([myName,'Botty 🤖'],'ai');
-});
+/* ---------- practice: pick your bot ---------- */
+(function(){
+  var list=$('botList');
+  BOTS.forEach(function(b){
+    var row=document.createElement('div');
+    row.className='botRow';
+    var ava=document.createElement('div');
+    ava.className='botAva';
+    ava.innerHTML=hatSpan(b.hat)+'🤖';
+    var txt=document.createElement('div');
+    var nm=document.createElement('div');nm.className='botName';nm.textContent=b.name;
+    var ds=document.createElement('div');ds.className='botDesc';ds.textContent=b.desc;
+    txt.appendChild(nm);txt.appendChild(ds);
+    var pips=document.createElement('div');
+    pips.className='botPips';
+    pips.textContent='●'.repeat(b.tier)+'○'.repeat(5-b.tier);
+    row.appendChild(ava);row.appendChild(txt);row.appendChild(pips);
+    row.addEventListener('click',function(){
+      currentBot=b;
+      hide($('botOv'));
+      myName=getName('You');
+      startLocalGame([myName,b.name],'ai');
+    });
+    list.appendChild(row);
+  });
+})();
+$('btnPractice').addEventListener('click',function(){show($('botOv'));});
+$('btnCloseBots').addEventListener('click',function(){hide($('botOv'));});
 
 /* offline support — lets the phone keep a downloaded copy of the game */
 if('serviceWorker' in navigator && location.protocol==='https:'){

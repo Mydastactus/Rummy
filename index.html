@@ -306,6 +306,11 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .betTag.resolved,.betTag.won{color:var(--gold); border-color:var(--gold-dim);}
 .betTag.push{color:rgba(242,237,218,.6); border-color:rgba(255,255,255,.25);}
 .btn.sm{padding:7px 11px; font-size:12.5px; border-radius:9px;}
+#btnRummy{animation:rummyPulse 1s ease-in-out infinite;}
+@keyframes rummyPulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(207,90,78,.65), 0 2px 10px rgba(0,0,0,.35);}
+  50%{box-shadow:0 0 0 10px rgba(207,90,78,0), 0 2px 10px rgba(0,0,0,.35);}
+}
 
 /* ---------- AVATARS & EMOTES ---------- */
 #avaPick{margin-bottom:14px;}
@@ -583,6 +588,7 @@ input{-webkit-user-select:text; user-select:text;}
   <div id="status"></div>
   <div id="handArea"></div>
   <div id="actions">
+    <button class="btn warn hidden" id="btnRummy">🚨 RUMMY!</button>
     <button class="btn" id="btnMeld">✨ Play meld</button>
     <button class="btn warn" id="btnDiscard">🗑️ Discard</button>
     <button class="btn alt hidden" id="btnUndo" title="Put picked-up pile cards back">↩️ Put back</button>
@@ -629,7 +635,8 @@ input{-webkit-user-select:text; user-select:text;}
       <li><b>The goal:</b> be the first to reach <b>500 points</b>. Points come from cards you play onto the table; cards stuck in your hand at the end of a round count <b>against</b> you.</li>
       <li><b>Your turn, step 1 — Draw:</b> take the top card of the deck, <b>or</b> take from the discard pile. You can grab the top discard for free, or <b>dig deeper</b> — but then you take every card on top of it too, and you must play the card you dug for <b>immediately</b> in a meld. Grabbed too much by mistake? The <b>↩️ Put back</b> button returns everything to the pile, as long as you haven't played a card yet.</li>
       <li><b>Step 2 — Meld (optional):</b> lay down a <b>set</b> (3–4 cards of the same rank, like 7♠7♥7♦) or a <b>run</b> (3+ cards of the same suit in a row, like 4♣5♣6♣). You can also <b>lay off</b> cards onto any meld on the table — even your opponent's — and those points are yours!</li>
-      <li><b>Step 3 — Discard:</b> end your turn by tossing one card onto the discard pile.</li>
+      <li><b>Step 3 — Discard:</b> end your turn by tossing one card onto the discard pile. Careful what you toss — see the next rule.</li>
+      <li><b>Call RUMMY! 🚨:</b> if a discard could have been played on a meld already on the table, the other player can call <b>RUMMY</b> before drawing. The card jumps into that meld with the <b>points going to the caller</b> — and as a penalty, the caller takes one card, <b>sight unseen</b>, from the careless discarder's hand. The bots watch for this too, so mind your discards.</li>
       <li><b>Card points:</b> 2 through 9 = <b>5 points</b> each · 10, J, Q, K = <b>10 points</b> each · Aces = <b>15 points</b> (played above the king, in a set, or caught in your hand) but only <b>5 points</b> when played low, as the 1 in A-2-3.</li>
       <li><b>Jokers are WILD 🃏:</b> two per deck. A joker can stand in for any card in a meld (one joker per meld). A melded joker is worth <b>+50 points</b> — but get caught holding one when the round ends and it's <b>−50</b>. High risk, high reward, very Wall Street.</li>
       <li><b>Joker heist:</b> a melded joker shows which card it's standing in for. If you're holding that exact card, click the joker on your turn (after drawing, nothing selected) to swap your real card in and take the joker for yourself. You can even discard a joker — but the other player can scoop it right up.</li>
@@ -852,6 +859,7 @@ function Game(names){
   this.bets=[];
   this.betSeq=0;
   this.undo=null;
+  this.rummyCall=null;
 }
 Game.prototype.ev=function(m){this.events.push(m);if(this.events.length>40)this.events.shift();};
 Game.prototype.deal=function(){
@@ -871,6 +879,7 @@ Game.prototype.deal=function(){
   this.roundOver=null;
   this.bets=[];
   this.undo=null;
+  this.rummyCall=null;
   this.ev('Round '+this.round+'! '+this.names[this.turn]+' goes first 🎲');
 };
 Game.prototype.chk=function(p,phase){
@@ -886,6 +895,7 @@ Game.prototype.drawStock=function(p){
   this.hands[p].push(this.stock.pop());
   this.phase='play';
   this.undo=null; // deck draws can't be undone — you've seen the card
+  this.rummyCall=null; // drawing closes the rummy-call window
   this.ev(this.names[p]+' drew from the deck');
   if(!this.stock.length)this.ev('⚠️ That was the last deck card!');
   return null;
@@ -904,6 +914,7 @@ Game.prototype.drawDiscard=function(p,idx){
   this.hands[p]=this.hands[p].concat(taken);
   this.discard=this.discard.slice(0,idx);
   this.phase='play';
+  this.rummyCall=null; // drawing closes the rummy-call window
   this.undo={ids:taken.map(function(c){return c.id;})}; // pile cards were public — safe to put back
   if(deep){
     this.mustMeld=target.id;
@@ -1041,6 +1052,43 @@ Game.prototype.discardCard=function(p,id){
   if(this.hands[p].length===0){this.endRound('out',p);return null;}
   this.turn=1-p;
   this.phase='draw';
+  // careless discard? if it fits a meld on the table, the opponent may call RUMMY
+  this.rummyCall=fitsAnyMeld(cs[0],this.melds)?{id:cs[0].id,by:p}:null;
+  return null;
+};
+Game.prototype.callRummy=function(p){
+  if(this.gameOver)return 'The game is over!';
+  if(this.roundOver)return 'The round is over!';
+  if(!this.rummyCall)return 'Nothing to call!';
+  if(this.rummyCall.by===p)return "You can't call rummy on your own discard!";
+  if(this.turn!==p)return 'Not your turn';
+  if(this.phase!=='draw')return 'Too late — you already drew';
+  var top=this.discard[this.discard.length-1];
+  if(!top||top.id!==this.rummyCall.id){this.rummyCall=null;return 'The moment has passed';}
+  var mi=-1,info=null,i;
+  for(i=0;i<this.melds.length;i++){
+    var m0=this.melds[i], comb=m0.cards.concat([top]);
+    var v=m0.type==='set'?validSet(comb):validRun(comb);
+    if(v){mi=i;info=v;break;}
+  }
+  if(mi<0){this.rummyCall=null;return "It doesn't fit anymore";}
+  this.discard.pop();
+  var m=this.melds[mi];
+  var added=top.joker
+    ?{id:top.id,joker:true,as:info.jokerAs,by:p,val:50}
+    :{id:top.id,suit:top.suit,rank:top.rank,by:p,val:meldCardVal(top,{type:m.type,aceHigh:info.aceHigh})};
+  m.cards.push(added);
+  m.aceHigh=!!info.aceHigh;
+  if(info.jokerAs)for(i=0;i<m.cards.length;i++)if(m.cards[i].joker)m.cards[i].as=info.jokerAs;
+  if(m.type==='run')sortRunCards(m.cards,m.aceHigh);
+  // penalty: a blind pick from the offender's hand
+  var off=this.rummyCall.by, oh=this.hands[off];
+  if(oh.length){
+    var ri=Math.floor(Math.random()*oh.length);
+    this.hands[p].push(oh.splice(ri,1)[0]);
+  }
+  this.ev('🚨 '+this.names[p]+' called RUMMY on the '+cardLabel(top)+' and took a blind card from '+this.names[off]+'!');
+  this.rummyCall=null;
   return null;
 };
 Game.prototype.after=function(p){
@@ -1085,7 +1133,9 @@ Game.prototype.viewFor=function(p){
     events:this.events.slice(-4),
     roundOver:this.roundOver, gameOver:this.gameOver,
     gid:this.gid, bets:this.bets,
-    canUndo:!!(this.undo&&this.turn===p&&this.phase==='play'&&!this.roundOver&&!this.gameOver)
+    canUndo:!!(this.undo&&this.turn===p&&this.phase==='play'&&!this.roundOver&&!this.gameOver),
+    rummyCall:(this.rummyCall&&this.rummyCall.by!==p&&this.turn===p&&this.phase==='draw'&&!this.roundOver&&!this.gameOver)
+      ?{label:labelOf(this.rummyCall.id)}:null
   };
 };
 
@@ -1165,6 +1215,12 @@ function aiStep(game,skill){
   if(game.roundOver||game.gameOver||game.turn!==1)return null;
   var hand=game.hands[1],i,j;
   if(game.phase==='draw'){
+    // sharp bots notice a careless discard and call RUMMY
+    if(game.rummyCall&&game.rummyCall.by!==1){
+      var callChance=skill.rummyCall!==undefined?skill.rummyCall:0.6;
+      if(Math.random()<callChance&&game.callRummy(1)===null)return 'rummy';
+      game.rummyCall=null; // chose to let it slide
+    }
     var bestIdx=-1;
     if(skill.dig!==false){
       var pile=game.discard;
@@ -1446,6 +1502,7 @@ function applyAction(a,p){
     case 'discard':    return game.discardCard(p,a.id);
     case 'swapJoker':  return game.swapJoker(p,a.mi);
     case 'undoDraw':   return game.undoDraw(p);
+    case 'rummyCall':  return game.callRummy(p);
     case 'betPropose': return game.proposeBet(p,a.text);
     case 'betVote':    return game.voteBet(p,a.id,a.ok);
   }
@@ -1653,6 +1710,7 @@ function render(v){
   if(v.gameOver!=null&&v.gameOver!==undefined&&v.gameOver){st='';}
   else if(v.roundOver){st='Round over!';}
   else if(!myTurn){st='⏳ '+v.names[1-v.you]+' is thinking…';}
+  else if(v.rummyCall){st='🚨 The '+v.rummyCall.label+' is playable — call RUMMY, or just draw';}
   else if(v.phase==='draw'){st=v.stock?'🫳 Your turn! Tap the deck — or grab from the discard pile':'🪫 Deck is empty — dig the pile, or tap the deck to end the round';}
   else if(v.mustMeld){st='⛏️ You must play the '+labelOf(v.mustMeld)+' in a meld now!';}
   else{st='✨ Meld or lay off if you can, then discard one card';}
@@ -1660,6 +1718,7 @@ function render(v){
   $('btnMeld').disabled=!(canPlay&&selIds().length>=3);
   $('btnDiscard').disabled=!(canPlay&&selIds().length===1&&!v.mustMeld);
   $('btnUndo').classList.toggle('hidden',!v.canUndo);
+  $('btnRummy').classList.toggle('hidden',!v.rummyCall);
   $('btnBets').classList.toggle('hidden',mode==='ai');
 
   // nudge when the opponent proposes a bet
@@ -2048,23 +2107,24 @@ $('btnCloseBetBook').addEventListener('click',function(){hide($('betBookOv'));})
 $('btnClearBetBook').addEventListener('click',function(){store.set('rw_bets',[]);showBetBook();toast('Bet book cleared — slate wiped 🧽');});
 
 $('btnUndo').addEventListener('click',function(){doAction({k:'undoDraw'});});
+$('btnRummy').addEventListener('click',function(){doAction({k:'rummyCall'});});
 
 /* ---------- the bot roster (practice opponents) ---------- */
 var BOTS=[
   {id:'rusty', name:'Rusty 🧢',      hat:'🧢',     tier:1, desc:'Fresh off the assembly line. Forgets to meld.',
-   skill:{dig:false, layoff:false, swap:false, meldChance:0.55, discard:'random'},
+   skill:{dig:false, layoff:false, swap:false, meldChance:0.55, discard:'random', rummyCall:0},
    replies:['Uhh… beep? 🤖','Was that good?','I meant to do that!','🧢','Which ones are the hearts again?']},
   {id:'botty', name:'Botty 🤖',      hat:'',       tier:2, desc:'The original. Steady hands, no drama.',
    skill:{},
    replies:['Beep. 🤖','Calculated. 😎','GG 🤝','My circuits made me do it 🤷','😂']},
   {id:'tex',   name:'Tex 🤠',        hat:'cowboy', tier:3, desc:'Quick draw. Never gifts you a lay-off.',
-   skill:{digDepth:5, discard:'safe'},
+   skill:{digDepth:5, discard:'safe', rummyCall:0.85},
    replies:['Yeehaw! 🤠','This town ain\'t big enough, partner.','Draw! …from the deck, I mean.','Tip o\' the hat to ya 🤠']},
   {id:'prof',  name:'Professor 🎓',  hat:'🎓',     tier:4, desc:'Digs deep and plays the percentages.',
-   skill:{digDepth:6, discard:'sharp'},
+   skill:{digDepth:6, discard:'sharp', rummyCall:0.95},
    replies:['Fascinating. 🎓','As I hypothesized.','Textbook, really.','Have you read my paper on deadwood theory?']},
   {id:'ace',   name:'Ace 👑',        hat:'👑',     tier:5, desc:'Ruthless. Digs deeper, wastes nothing.',
-   skill:{digDepth:9, discard:'sharp'},
+   skill:{digDepth:9, discard:'sharp', rummyCall:1},
    replies:['👑','Bow before the crown.','All part of the plan.','You blinked. I melded.','GG. Naturally.']}
 ];
 var currentBot=BOTS[1];

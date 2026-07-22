@@ -52,6 +52,13 @@ body::before{ /* felt grain */
     url('jungle-felt.jpg') center/cover no-repeat,
     url('jungle-felt.jpg.png') center/cover no-repeat;
 }
+/* Lovers table: burgundy hearts-and-roses damask (gradient fallback) */
+.deck-lovers #bgFloat{
+  background:
+    radial-gradient(ellipse at 50% 42%, rgba(0,0,0,0) 45%, rgba(20,4,10,.55) 100%),
+    url('lovers-felt.jpg') center/cover no-repeat,
+    url('lovers-felt.jpg.png') center/cover no-repeat;
+}
 #bgFloat span{position:absolute; font-size:44px; color:#03130b; opacity:.08; animation:floaty 20s ease-in-out infinite;}
 @keyframes floaty{0%,100%{transform:translateY(0) rotate(-6deg);}50%{transform:translateY(-26px) rotate(6deg);}}
 .screen{position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column;}

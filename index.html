@@ -491,6 +491,46 @@ body.deck-lovers{
 #confetti{position:fixed; inset:0; pointer-events:none; z-index:90; overflow:hidden;}
 .confPiece{position:absolute; top:-40px; font-size:24px; animation:confFall linear forwards;}
 @keyframes confFall{to{transform:translateY(110vh) rotate(720deg);}}
+/* ---------- COMPACT MODE — plays nicely beside a FaceTime PiP window ---------- */
+body.compact #bgFloat{display:none;}
+body.compact{--card-w:46px; --card-h:66px;}
+body.compact #game{padding-top:calc(4px + env(safe-area-inset-top));}
+body.compact #topbar{padding:4px 10px; margin-bottom:6px; border-radius:10px;}
+body.compact .scoreChip{font-size:12.5px; gap:5px;}
+body.compact .scoreChip .pts{padding:1px 9px; font-size:12.5px;}
+body.compact .ava{width:24px; height:24px; font-size:14px;}
+body.compact .ava .hatE{font-size:10px; top:-6px;}
+body.compact #roundPill{font-size:9.5px; padding:2px 8px;}
+body.compact #oppArea{min-height:38px; margin-bottom:2px;}
+body.compact #oppHand .back{width:30px !important; height:42px !important; margin-left:-24px !important; border-width:1.5px !important;}
+body.compact #oppHand .back:first-child{margin-left:0 !important;}
+body.compact #meldsArea{min-height:60px; padding:6px; gap:6px; margin-bottom:6px; border-radius:12px;}
+body.compact .card.mini{width:32px; height:46px; border-radius:5px;}
+body.compact .card.mini .pip{font-size:13px;}
+body.compact .card.mini .corner{font-size:10px; top:2px; left:3px;}
+body.compact .card.mini .corner small{font-size:8px;}
+body.compact #stockPile.back{width:calc(var(--card-w)*1.15); height:calc(var(--card-h)*1.15); border-radius:8px;}
+body.compact .back::after{width:24px; height:24px; font-size:8px;}
+body.compact #pilesArea{gap:12px; margin-bottom:4px;}
+body.compact #discardRow{padding:8px 4px 2px;}
+body.compact #discardRow .card{margin-left:-26px;}
+body.compact .pileLabel{display:none;}
+body.compact #stockCount{font-size:10px; margin-top:2px;}
+body.compact #log{display:none;}
+body.compact #status{font-size:12.5px; margin:3px auto 6px; padding:3px 12px; min-height:17px;}
+body.compact #handArea{padding:10px 2px 2px; min-height:72px;}
+body.compact #handArea .card{margin:2px 1px;}
+body.compact .pipS{font-size:9.5px;}
+body.compact .pip.aceBig{font-size:24px;}
+body.compact .card .corner{font-size:11px; top:3px; left:3.5px;}
+body.compact .card .corner small{font-size:9px;}
+body.compact .card .corner.br{top:auto; left:auto; bottom:3px; right:3.5px;}
+body.compact .faceBox{inset:2px 6px;}
+body.compact .btn{padding:8px 12px; font-size:13px;}
+body.compact #actions{gap:8px; padding-bottom:calc(4px + env(safe-area-inset-bottom));}
+body.compact #emoteLayer{top:calc(40px + env(safe-area-inset-top));}
+body.compact #netStatus{top:calc(38px + env(safe-area-inset-top)); font-size:11px; padding:5px 12px;}
+
 /* ---------- PHONE / TOUCH TUNING ---------- */
 html,body{overscroll-behavior:none;}
 .screen{min-height:100vh; min-height:100dvh;}
@@ -607,6 +647,7 @@ input{-webkit-user-select:text; user-select:text;}
     <button class="btn ghost" id="btnEmote" title="Send a quick message">😊</button>
     <button class="btn ghost" id="btnSort" title="Auto-sort your hand by suit">🧹 Sort</button>
     <button class="btn ghost hidden" id="btnBets" title="Round bets">🎲</button>
+    <button class="btn ghost" id="btnCompact" title="Compact layout — leaves room for FaceTime">📹</button>
     <button class="btn ghost" id="btnDeck" title="Switch deck style">🎴</button>
     <button class="btn ghost" id="btnHelp2">📖</button>
   </div>
@@ -2477,6 +2518,19 @@ $('btnDeck').addEventListener('click',function(){
   var next=DECK_THEMES[(i+1)%DECK_THEMES.length];
   setDeck(next.id);
   toast(next.label+' deck!');
+});
+
+/* ---------- compact mode (FaceTime-friendly, remembered per phone) ---------- */
+var compactMode=!!store.get('rw_compact',false);
+function setCompact(on){
+  compactMode=!!on;
+  document.body.classList.toggle('compact',compactMode);
+  store.set('rw_compact',compactMode);
+}
+setCompact(compactMode);
+$('btnCompact').addEventListener('click',function(){
+  setCompact(!compactMode);
+  toast(compactMode?'📹 Compact table — room for FaceTime':'🖥️ Full-size table');
 });
 
 /* ---------- practice: pick your bot ---------- */

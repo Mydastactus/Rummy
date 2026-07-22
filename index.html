@@ -222,6 +222,7 @@ input:focus{border-color:var(--gold); box-shadow:0 0 0 3px rgba(230,193,90,.18);
 .pip.aceBig{font-size:34px;}
 .pipS{position:absolute; font-size:13px; line-height:1; transform:translate(-50%,-50%);}
 .pipS.f{transform:translate(-50%,-50%) rotate(180deg);}
+.pip.midSuit{display:none;} /* shown only in compact mode */
 .faceBox{position:absolute; inset:3px 9px;}
 .faceBox svg{width:100%; height:100%; display:block;}
 .card.clickable{cursor:pointer;}
@@ -520,11 +521,14 @@ body.compact #log{display:none;}
 body.compact #status{font-size:12.5px; margin:3px auto 6px; padding:3px 12px; min-height:17px;}
 body.compact #handArea{padding:10px 2px 2px; min-height:72px;}
 body.compact #handArea .card{margin:2px 1px;}
-body.compact .pipS{font-size:9.5px;}
-body.compact .pip.aceBig{font-size:24px;}
-body.compact .card .corner{font-size:11px; top:3px; left:3.5px;}
-body.compact .card .corner small{font-size:9px;}
-body.compact .card .corner.br{top:auto; left:auto; bottom:3px; right:3.5px;}
+/* small cards trade the pip layout for one BIG suit — ♣ vs ♠ readable at a glance */
+body.compact .pipS{display:none;}
+body.compact .pip.midSuit{display:flex; font-size:26px;}
+body.compact .pip.aceBig{font-size:28px;}
+body.compact .card .corner{font-size:12.5px; top:2.5px; left:3.5px;}
+body.compact .card .corner small{font-size:11.5px;}
+body.compact .card .corner.br{top:auto; left:auto; bottom:2.5px; right:3.5px;}
+body.compact .card.mini .pip{font-size:16px;}
 body.compact .faceBox{inset:2px 6px;}
 body.compact .btn{padding:8px 12px; font-size:13px;}
 body.compact #actions{gap:8px; padding-bottom:calc(4px + env(safe-area-inset-bottom));}
@@ -550,8 +554,9 @@ input{-webkit-user-select:text; user-select:text;}
   .pipS{font-size:10.5px;}
   .faceBox{inset:2px 7px;}
   .card .corner{font-size:12px; top:3px; left:4px;}
-  .card .corner small{font-size:10px;}
+  .card .corner small{font-size:11.5px;}
   .card .corner.br{top:auto; left:auto; bottom:3px; right:4px;}
+  .card.mini .pip{font-size:17px;}
   .back::after{width:26px; height:26px; font-size:9px;}
   .card.mini{--card-w:38px; width:38px; height:56px;}
   .card.mini .pip{font-size:15px;}
@@ -1549,7 +1554,8 @@ function cardEl(c,opts){
            +'<div class="corner br">'+rn+'<small>'+sc+'</small></div>';
       if(c.rank===1)inner+='<div class="pip aceBig">'+sc+'</div>';
       else if(c.rank>=11)inner+='<div class="faceBox">'+faceSVG(c.rank,sc)+'</div>';
-      else inner+=PIPS[c.rank].map(function(p){return pipSpan(sc,p);}).join('');
+      else inner+=PIPS[c.rank].map(function(p){return pipSpan(sc,p);}).join('')
+                 +'<div class="pip midSuit">'+sc+'</div>'; // compact mode swaps pips for one big suit
     }
     d.innerHTML=inner;
     d.dataset.suit=c.suit;

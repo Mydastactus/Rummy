@@ -626,7 +626,8 @@ input{-webkit-user-select:text; user-select:text;}
     </div>
     <div class="joinRow">
       <button class="btn ghost" id="btnStats" style="flex:1;">📊 Stats</button>
-      <button class="btn ghost" id="btnBetBook" style="flex:1;">🎲 Bet book</button>
+      <button class="btn ghost" id="btnBetBook" style="flex:1;">🎲 Bets</button>
+      <button class="btn ghost" id="btnFriends" style="flex:1;">👥 Friends</button>
     </div>
     <button class="btn ghost" id="btnHelp">📖 How to play</button>
   </div>
@@ -679,6 +680,7 @@ input{-webkit-user-select:text; user-select:text;}
     <h2>Table's ready! 🪑</h2>
     <p>Send your friend this file <b>and</b> this code.<br>They open the game, type the code, and hit Join.</p>
     <div class="codeBig" id="codeShow">----</div>
+    <button class="btn big" id="btnInviteWait">💬 Text an invite</button>
     <p id="waitMsg" style="font-size:14px; opacity:.8;">Waiting for your friend to join<span class="dots">…</span></p>
     <button class="btn ghost" id="btnCancelWait" style="color:#7b2ff7; border-color:#c9a7f5;">← Back to menu</button>
   </div>
@@ -764,6 +766,23 @@ input{-webkit-user-select:text; user-select:text;}
     <div id="betBookList" style="text-align:left; max-height:50vh; overflow-y:auto;"></div>
     <button class="btn big" id="btnCloseBetBook">Close</button>
     <button class="btn ghost" id="btnClearBetBook">Clear history</button>
+  </div>
+</div>
+
+<!-- ============ FRIENDS ============ -->
+<div class="overlay hidden" id="friendsOv">
+  <div class="ov-card">
+    <h2>👥 Friends</h2>
+    <p style="margin:2px 0 4px;">Your code: <b id="myCodeShow" style="color:var(--gold); letter-spacing:4px; font-family:Georgia,serif; font-size:20px;"></b></p>
+    <p style="font-size:11.5px; opacity:.6; margin:0 0 12px;">It never changes. Friends who have it can join your table any time you're hosting — and anyone you play gets saved here automatically.</p>
+    <button class="btn big" id="btnInviteText">💬 Text an invite (starts your table)</button>
+    <div id="friendList" style="text-align:left; max-height:34vh; overflow-y:auto;"></div>
+    <div class="joinRow">
+      <input id="frName" placeholder="Name" maxlength="14">
+      <input id="frCode" placeholder="CODE" maxlength="4" style="max-width:110px;">
+    </div>
+    <button class="btn alt big" id="btnAddFriend">➕ Add friend</button>
+    <button class="btn ghost" id="btnCloseFriends">Close</button>
   </div>
 </div>
 
@@ -2151,7 +2170,7 @@ function getName(fallback){
   return n||fallback;
 }
 /* ---------- resilient session networking: auto-reconnect + resume ---------- */
-var sessionCode=null, reconnectTimer=null, reconnectTries=0, tearingDown=false;
+var sessionCode=null, reconnectTimer=null, reconnectTries=0, tearingDown=false, hostRetries=0;
 function setNetStatus(txt){
   var el=$('netStatus');
   if(!txt)el.classList.add('hidden');
@@ -2204,7 +2223,15 @@ function hostListen(code){
   peer.on('error',function(err){
     if(err&&err.type==='unavailable-id'){
       if(game){setNetStatus('reclaiming the table…');scheduleReconnect(4000);}
-      else{var c2=randCode();$('codeShow').textContent=c2;hostListen(c2);}
+      else if(++hostRetries<=2){ // your permanent code may just be stale on the relay — retry it
+        setNetStatus('claiming your table…');
+        setTimeout(function(){hostListen(code);},2500);
+      }else{
+        var c2=randCode();
+        $('codeShow').textContent=c2;
+        toast('Your usual code was busy — using '+c2+' for this game',true);
+        hostListen(c2);
+      }
     }else if(err&&(err.type==='network'||err.type==='server-error'||err.type==='socket-error'||err.type==='socket-closed')){
       if(game){setNetStatus('no connection — retrying…');scheduleReconnect(5000);}
       else friendlyPeerError(err);
@@ -2223,6 +2250,7 @@ function hostOnData(msg){
   if(!msg)return;
   if(msg.t==='hello'){
     oppAvatarData=validAva(msg.ava)?msg.ava:null;
+    upsertFriend(msg.name,msg.code); // whoever joins your table becomes a friend
     if(conn&&conn.open)conn.send({t:'meta',ava:store.get('rw_avatar',null)});
     reconnectTries=0;
     if(!game){
@@ -2260,7 +2288,7 @@ function guestConnect(code,resuming){
     conn.on('open',function(){
       reconnectTries=0;
       setNetStatus(null);
-      conn.send({t:'hello',name:myName,ava:store.get('rw_avatar',null)});
+      conn.send({t:'hello',name:myName,ava:store.get('rw_avatar',null),code:myCode()});
       myAvaEmoji='🐻';oppAvaEmoji='🐂';
       refreshAvatars();
     });
@@ -2274,6 +2302,7 @@ function guestOnData(msg){
   if(msg.t==='state'){
     clearSelIfTurnChanged(msg.v);
     render(msg.v);
+    upsertFriend(msg.v.names[0],sessionCode); // the host becomes a friend
     if(msg.v.gameOver)store.set('rw_save',null);
     else store.set('rw_save',{role:'guest',code:sessionCode,myName:myName,oppName:msg.v.names[0],
       ts:Date.now(),lastView:msg.v,recorded:{r:recordedRounds,g:recordedGames}});
@@ -2287,6 +2316,97 @@ document.addEventListener('visibilitychange',function(){
     reconnectTries=0;
     attemptReconnect();
   }
+});
+
+/* ---------- friends & text invites ---------- */
+function myCode(){
+  var c=store.get('rw_mycode',null);
+  if(!c||!/^[A-Z]{4}$/.test(c)){c=randCode();store.set('rw_mycode',c);}
+  return c;
+}
+function getFriends(){return store.get('rw_friends',[]);}
+function upsertFriend(name,code){
+  if(!code)return;
+  code=String(code).toUpperCase();
+  if(!/^[A-Z]{4}$/.test(code)||code===myCode())return;
+  var fs=getFriends(),found=false;
+  fs.forEach(function(f){if(f.code===code){if(name)f.name=String(name).slice(0,20);found=true;}});
+  if(!found)fs.push({name:String(name||'Friend').slice(0,20),code:code});
+  store.set('rw_friends',fs.slice(0,20));
+}
+function renderFriends(){
+  $('myCodeShow').textContent=myCode();
+  var list=$('friendList');list.innerHTML='';
+  var fs=getFriends();
+  if(!fs.length){
+    var ph=document.createElement('div');
+    ph.style.cssText='opacity:.55;font-size:13px;text-align:center;padding:10px 0 14px;';
+    ph.textContent='No friends yet — add one below, or play someone once and they save themselves.';
+    list.appendChild(ph);
+  }
+  fs.forEach(function(f){
+    var row=document.createElement('div');
+    row.className='betItem';
+    var txt=document.createElement('div');
+    txt.className='txt';
+    txt.textContent=f.name;
+    var sub=document.createElement('div');
+    sub.style.cssText='font-size:11px;opacity:.6;letter-spacing:2px;';
+    sub.textContent=f.code;
+    txt.appendChild(sub);
+    var join=document.createElement('button');
+    join.className='btn sm';join.textContent='🎮 Join';
+    join.addEventListener('click',function(){
+      if(typeof Peer==='undefined'){noPeerMsg();return;}
+      hide($('friendsOv'));
+      myName=getName(store.get('rw_name','')||'Bear 🐻');
+      reconnectTries=0;
+      toast('Knocking on '+f.name+"'s table… 🚪");
+      guestConnect(f.code,false);
+    });
+    var del=document.createElement('button');
+    del.className='btn sm warn';del.textContent='✕';
+    del.addEventListener('click',function(){
+      store.set('rw_friends',getFriends().filter(function(x){return x.code!==f.code;}));
+      renderFriends();
+    });
+    row.appendChild(txt);row.appendChild(join);row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+function inviteText(){
+  var code=myCode();
+  var url=location.origin+location.pathname+'?join='+code;
+  var text='🃏 Deal you in? Join my D&R Rummy Wilds table '+code+' — tap to play: '+url;
+  if(navigator.share){navigator.share({text:text}).catch(function(){});}
+  else if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text);
+    toast('Invite copied — paste it into a text 📋');
+  }else{
+    location.href='sms:?&body='+encodeURIComponent(text);
+  }
+}
+$('btnFriends').addEventListener('click',function(){renderFriends();show($('friendsOv'));});
+$('btnCloseFriends').addEventListener('click',function(){hide($('friendsOv'));});
+$('btnAddFriend').addEventListener('click',function(){
+  var n=$('frName').value.trim(),c=$('frCode').value.trim().toUpperCase();
+  if(!n||!/^[A-Z]{4}$/.test(c)){toast('Need a name and their 4-letter code',true);return;}
+  upsertFriend(n,c);
+  $('frName').value='';$('frCode').value='';
+  renderFriends();
+  toast(n+' added 👥');
+});
+$('btnInviteText').addEventListener('click',function(){
+  if(typeof Peer==='undefined'){noPeerMsg();return;}
+  hide($('friendsOv'));
+  if(mode!=='host'){ // start hosting on your permanent code so the invite works
+    myName=getName(store.get('rw_name','')||'Bull 🐂');
+    $('codeShow').textContent=myCode();
+    show($('waitOv'));
+    reconnectTries=0;hostRetries=0;
+    hostListen(myCode());
+  }
+  setTimeout(inviteText,350);
 });
 
 /* ---------- resume a saved game from the menu ---------- */
@@ -2336,11 +2456,10 @@ renderResumeRow();
 $('btnCreate').addEventListener('click',function(){
   if(typeof Peer==='undefined'){noPeerMsg();return;}
   myName=getName('Bull 🐂');
-  var code=randCode();
-  $('codeShow').textContent=code;
+  $('codeShow').textContent=myCode(); // your table, your permanent code
   show($('waitOv'));
-  reconnectTries=0;
-  hostListen(code);
+  reconnectTries=0;hostRetries=0;
+  hostListen(myCode());
 });
 $('btnJoin').addEventListener('click',function(){
   if(typeof Peer==='undefined'){noPeerMsg();return;}
@@ -2720,6 +2839,23 @@ $('btnCloseBots').addEventListener('click',function(){hide($('botOv'));});
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js').catch(function(){});
 }
+
+$('btnInviteWait').addEventListener('click',inviteText);
+
+/* tap-to-join links: opening the game with ?join=CODE walks straight to that table */
+(function(){
+  try{
+    var m=location.search.match(/[?&]join=([A-Za-z]{4})/);
+    if(m&&typeof Peer!=='undefined'){
+      var code=m[1].toUpperCase();
+      try{history.replaceState(null,'',location.pathname);}catch(e){}
+      myName=getName(store.get('rw_name','')||'Bear 🐻');
+      toast('Joining table '+code+'… 🚪');
+      reconnectTries=0;
+      guestConnect(code,false);
+    }
+  }catch(e){}
+})();
 
 /* Enter key conveniences */
 $('codeInput').addEventListener('keydown',function(e){if(e.key==='Enter')$('btnJoin').click();});
